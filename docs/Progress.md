@@ -164,3 +164,4 @@ $$\mathbf{14.8\% \text{ Complete (P0 Scope: 4 / 27 Tickets Completed)}}$$
 
 - **2026-10-01**: Comprehensive project documentation suite created (`docs/PRD.md`, `docs/TECHNICAL_ARCHITECTURE.md`, `docs/SECURITY_AND_ACCESS.md`, `docs/FRONTEND_SPEC.md`, `docs/FEATURE_TICKETS.md`, `docs/Progress.md`).
 - **2026-10-01**: Phase 0 Foundation completed: verified dependencies added to `pubspec.yaml`, design system tokens and Inter typography implemented in `lib/app/theme/`, go_router shell route with 5-tab persistent bottom navigation registered, core UI components built, `firestore.rules` deployed, and smoke test passed with 0 analyzer issues.
+- **2026-10-01**: Screen 01 Splash implemented in `lib/features/onboarding/presentation/splash_screen.dart` matching `visily-01-splash.png`. Features 3-second display of logo and tagline with smooth entrance animation before smoothly revealing the "Get Started" and "Log In" actions. Router and automated widget tests verified.

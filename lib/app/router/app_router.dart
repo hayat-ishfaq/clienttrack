@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'route_names.dart';
 import '../../shared/widgets/navigation/main_scaffold_shell.dart';
 import '../../shared/widgets/navigation/placeholder_screen.dart';
+import '../../features/onboarding/presentation/splash_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final GlobalKey<NavigatorState> _homeNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'home');
@@ -17,18 +18,14 @@ final GlobalKey<NavigatorState> _settingsNavigatorKey = GlobalKey<NavigatorState
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: AppRoutes.dashboard,
+    initialLocation: AppRoutes.splash,
     debugLogDiagnostics: true,
     routes: [
       // 01 Splash
       GoRoute(
         path: AppRoutes.splash,
         name: AppRoutes.splashName,
-        builder: (context, state) => const PlaceholderScreen(
-          title: 'ClientTrack',
-          subtitle: 'Get paid on time, every time.',
-          icon: Icons.shield_outlined,
-        ),
+        builder: (context, state) => const SplashScreen(),
       ),
       // 02 Onboarding
       GoRoute(
