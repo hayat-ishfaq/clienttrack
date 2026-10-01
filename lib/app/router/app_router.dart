@@ -11,13 +11,13 @@ import '../../features/onboarding/presentation/profile_setup_screen.dart';
 import '../../features/auth/presentation/signup_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/forgot_password_screen.dart';
+import '../../features/dashboard/presentation/dashboard_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final GlobalKey<NavigatorState> _homeNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'home');
 final GlobalKey<NavigatorState> _clientsNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'clients');
 final GlobalKey<NavigatorState> _projectsNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'projects');
 final GlobalKey<NavigatorState> _invoicesNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'invoices');
-final GlobalKey<NavigatorState> _settingsNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'settings');
 
 /// Riverpod provider for GoRouter.
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -63,7 +63,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ProfileSetupScreen(),
       ),
 
-      // 5-Tab Persistent Navigation Shell
+      // 4-Tab Persistent Navigation Shell (visily-07-dashboard.png)
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return MainScaffoldShell(navigationShell: navigationShell);
@@ -76,11 +76,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: AppRoutes.dashboard,
                 name: AppRoutes.dashboardName,
-                builder: (context, state) => const PlaceholderScreen(
-                  title: 'Dashboard',
-                  subtitle: 'Daily operational overview & cashflow tracking.',
-                  icon: Icons.grid_view_rounded,
-                ),
+                builder: (context, state) => const DashboardScreen(),
               ),
             ],
           ),
@@ -109,7 +105,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 builder: (context, state) => const PlaceholderScreen(
                   title: 'Projects',
                   subtitle: 'Active deliverables, milestones, and deadlines.',
-                  icon: Icons.folder_outlined,
+                  icon: Icons.work_outline_rounded,
                 ),
               ),
             ],
@@ -124,22 +120,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 builder: (context, state) => const PlaceholderScreen(
                   title: 'Invoices',
                   subtitle: 'Ledger of all draft, sent, and paid invoices.',
-                  icon: Icons.receipt_long_outlined,
-                ),
-              ),
-            ],
-          ),
-          // Tab 5: Settings
-          StatefulShellBranch(
-            navigatorKey: _settingsNavigatorKey,
-            routes: [
-              GoRoute(
-                path: AppRoutes.settings,
-                name: AppRoutes.settingsName,
-                builder: (context, state) => const PlaceholderScreen(
-                  title: 'Settings',
-                  subtitle: 'Subscription, business profile, and preferences.',
-                  icon: Icons.settings_outlined,
+                  icon: Icons.description_outlined,
                 ),
               ),
             ],
@@ -284,6 +265,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           title: 'Business Profile',
           subtitle: 'Manage your business address and invoice header details.',
           icon: Icons.storefront_outlined,
+        ),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: AppRoutes.settings,
+        name: AppRoutes.settingsName,
+        builder: (context, state) => const PlaceholderScreen(
+          title: 'Settings',
+          subtitle: 'Subscription, business profile, and preferences.',
+          icon: Icons.settings_outlined,
         ),
       ),
     ],
