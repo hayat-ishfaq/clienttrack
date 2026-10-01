@@ -6,6 +6,7 @@ import 'route_names.dart';
 import '../../shared/widgets/navigation/main_scaffold_shell.dart';
 import '../../shared/widgets/navigation/placeholder_screen.dart';
 import '../../features/onboarding/presentation/splash_screen.dart';
+import '../../features/onboarding/presentation/onboarding_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final GlobalKey<NavigatorState> _homeNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'home');
@@ -31,11 +32,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.onboarding,
         name: AppRoutes.onboardingName,
-        builder: (context, state) => const PlaceholderScreen(
-          title: 'Welcome to ClientTrack',
-          subtitle: 'Manage clients, projects, and invoices with ease.',
-          icon: Icons.auto_awesome,
-        ),
+        builder: (context, state) => const OnboardingScreen(),
       ),
       // 03 Sign Up
       GoRoute(
