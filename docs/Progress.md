@@ -25,37 +25,37 @@
 
 ## Overall Progress Summary
 
-$$\mathbf{0.0\% \text{ Complete (P0 Scope: 0 / 27 Tickets Completed)}}$$
+$$\mathbf{14.8\% \text{ Complete (P0 Scope: 4 / 27 Tickets Completed)}}$$
 
 | Phase | Phase Name | Status | % Complete | Done / Total |
 | :---: | :--- | :---: | :---: | :---: |
-| **Phase 0** | Project Setup & Architecture | Pending | 0% | 0 / 4 (P0) |
-| **Phase 1** | Core Product & Invoicing | Pending | 0% | 0 / 7 (P0) |
+| **Phase 0** | Project Setup & Architecture | Completed | 100% | 4 / 4 (P0) |
+| **Phase 1** | Core Product & Invoicing | In Progress | 0% | 0 / 7 (P0) |
 | **Phase 2** | Payment Chaser Engine | Pending | 0% | 0 / 3 (P0) |
 | **Phase 3** | Dashboard Cockpit | Pending | 0% | 0 / 1 (P0) |
 | **Phase 4** | Local Notifications | Pending | 0% | 0 / 2 (P0) |
 | **Phase 5** | Monetization & RevenueCat | Pending | 0% | 0 / 4 (P0) |
 | **Phase 6** | Release Readiness & Store | Pending | 0% | 0 / 6 (P0) |
 | **Phase 7** | Post-P0 / Time-Permitting | Deferred | 0% | 0 / 10 (P1/P2) |
-| **TOTAL** | | | **0.0%** | **0 / 37** |
+| **TOTAL** | | | **10.8%** | **4 / 37** |
 
 ---
 
 ## Active Status
 
-- **Currently Working On**: Documentation review and approval; awaiting user prompt to start Phase 0 execution.
-- **Next Up**: FT-001 (Flutter Environment & Dependency Setup), FT-002 (Design System & Theme Engine).
-- **Blockers**: None currently blocking Phase 0 setup.
+- **Currently Working On**: Phase 0 complete. Ready to begin Phase 1: Core Product & Data Pipelines (starting with FT-005: Authentication & Session Management).
+- **Next Up**: FT-005 (Authentication & Session Management), FT-006 (Onboarding & Profile Setup).
+- **Blockers**: None.
 
 ---
 
 ## Master Feature Ticket Checklist
 
 ### Phase 0: Project Setup & Architecture Setup
-- [ ] **FT-001**: Flutter Environment & Dependency Setup (P0)
-- [ ] **FT-002**: App Design System & Theme Engine (P0)
-- [ ] **FT-003**: Core Router & Shell Navigation Setup (P0)
-- [ ] **FT-004**: Firebase Initialization & Firestore Rules Setup (P0)
+- [x] **FT-001**: Flutter Environment & Dependency Setup (P0)
+- [x] **FT-002**: App Design System & Theme Engine (P0)
+- [x] **FT-003**: Core Router & Shell Navigation Setup (P0)
+- [x] **FT-004**: Firebase Initialization & Firestore Rules Setup (P0)
 
 ### Phase 1: Core Product & Data Pipelines
 - [ ] **FT-005**: Authentication & Session Management (P0)
@@ -150,7 +150,7 @@ $$\mathbf{0.0\% \text{ Complete (P0 Scope: 0 / 27 Tickets Completed)}}$$
 
 ## Target Project Milestones
 
-- **Milestone 1**: Phase 0 Architecture, Theme, and Navigation Shell complete.
+- **Milestone 1**: Phase 0 Architecture, Theme, and Navigation Shell complete. (Done: 2026-10-01)
 - **Milestone 2**: Phase 1 Core loop (Auth $\to$ Client $\to$ Project $\to$ Invoice $\to$ PDF) complete.
 - **Milestone 3**: Phase 2 Payment Chaser ("Needs Follow-up", templates, sharing) complete.
 - **Milestone 4**: Phase 3 Dashboard and Phase 4 Local Notifications complete.
@@ -163,3 +163,4 @@ $$\mathbf{0.0\% \text{ Complete (P0 Scope: 0 / 27 Tickets Completed)}}$$
 ## Change Log
 
 - **2026-10-01**: Comprehensive project documentation suite created (`docs/PRD.md`, `docs/TECHNICAL_ARCHITECTURE.md`, `docs/SECURITY_AND_ACCESS.md`, `docs/FRONTEND_SPEC.md`, `docs/FEATURE_TICKETS.md`, `docs/Progress.md`).
+- **2026-10-01**: Phase 0 Foundation completed: verified dependencies added to `pubspec.yaml`, design system tokens and Inter typography implemented in `lib/app/theme/`, go_router shell route with 5-tab persistent bottom navigation registered, core UI components built, `firestore.rules` deployed, and smoke test passed with 0 analyzer issues.
