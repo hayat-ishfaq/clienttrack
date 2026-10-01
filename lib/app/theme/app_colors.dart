@@ -12,7 +12,7 @@ class AppColors {
   static const Color deepTeal = Color(0xFF2F7A6A);
 
   // Surfaces & Backgrounds
-  static const Color background = Color(0xFFF6F9F6);
+  static const Color background = Color(0xFFFFFFFF);
   static const Color surface = Color(0xFFFFFFFF);
   static const Color surfaceMuted = Color(0xFFF0F4F1);
   static const Color border = Color(0xFFE1E8E2);
