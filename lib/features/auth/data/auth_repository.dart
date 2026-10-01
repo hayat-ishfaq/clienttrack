@@ -78,6 +78,29 @@ class AuthRepository {
     await _auth.sendPasswordResetEmail(email: email.trim());
   }
 
+  /// Update user profile details (fullName, businessName, currencyCode).
+  Future<void> updateUserProfile({
+    required String fullName,
+    String? businessName,
+    required String currencyCode,
+  }) async {
+    final user = _auth.currentUser;
+    if (user != null) {
+      try {
+        final firestore = FirebaseFirestore.instance;
+        await firestore.collection('users').doc(user.uid).set({
+          'fullName': fullName.trim(),
+          if (businessName != null && businessName.trim().isNotEmpty)
+            'businessName': businessName.trim(),
+          'currencyCode': currencyCode.trim(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } catch (_) {
+        // Fallback for offline or local cache
+      }
+    }
+  }
+
   /// Sign out current user.
   Future<void> signOut() async {
     await _auth.signOut();

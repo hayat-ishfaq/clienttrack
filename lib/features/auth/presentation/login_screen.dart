@@ -89,7 +89,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   void _onForgotPassword() {
-    context.go(AppRoutes.forgotPassword);
+    context.push(AppRoutes.forgotPassword);
   }
 
   @override

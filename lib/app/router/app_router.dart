@@ -7,8 +7,10 @@ import '../../shared/widgets/navigation/main_scaffold_shell.dart';
 import '../../shared/widgets/navigation/placeholder_screen.dart';
 import '../../features/onboarding/presentation/splash_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
+import '../../features/onboarding/presentation/profile_setup_screen.dart';
 import '../../features/auth/presentation/signup_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
+import '../../features/auth/presentation/forgot_password_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final GlobalKey<NavigatorState> _homeNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'home');
@@ -52,21 +54,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.forgotPassword,
         name: AppRoutes.forgotPasswordName,
-        builder: (context, state) => const PlaceholderScreen(
-          title: 'Reset Password',
-          subtitle: 'Enter your email to receive a password reset link.',
-          icon: Icons.lock_reset_outlined,
-        ),
+        builder: (context, state) => const ForgotPasswordScreen(),
       ),
       // 06 Profile Setup
       GoRoute(
         path: AppRoutes.profileSetup,
         name: AppRoutes.profileSetupName,
-        builder: (context, state) => const PlaceholderScreen(
-          title: 'Profile Setup',
-          subtitle: 'Set up your business name and default currency.',
-          icon: Icons.badge_outlined,
-        ),
+        builder: (context, state) => const ProfileSetupScreen(),
       ),
 
       // 5-Tab Persistent Navigation Shell
