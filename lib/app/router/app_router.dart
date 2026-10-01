@@ -7,6 +7,8 @@ import '../../shared/widgets/navigation/main_scaffold_shell.dart';
 import '../../shared/widgets/navigation/placeholder_screen.dart';
 import '../../features/onboarding/presentation/splash_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
+import '../../features/auth/presentation/signup_screen.dart';
+import '../../features/auth/presentation/login_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final GlobalKey<NavigatorState> _homeNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'home');
@@ -38,21 +40,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.signup,
         name: AppRoutes.signupName,
-        builder: (context, state) => const PlaceholderScreen(
-          title: 'Create Account',
-          subtitle: 'Sign up to sync your invoices and clients securely.',
-          icon: Icons.person_add_outlined,
-        ),
+        builder: (context, state) => const SignUpScreen(),
       ),
       // 04 Login
       GoRoute(
         path: AppRoutes.login,
         name: AppRoutes.loginName,
-        builder: (context, state) => const PlaceholderScreen(
-          title: 'Welcome Back',
-          subtitle: 'Log in with your email and password.',
-          icon: Icons.login_outlined,
-        ),
+        builder: (context, state) => const LoginScreen(),
       ),
       // 05 Forgot Password
       GoRoute(

@@ -25,26 +25,26 @@
 
 ## Overall Progress Summary
 
-$$\mathbf{14.8\% \text{ Complete (P0 Scope: 4 / 27 Tickets Completed)}}$$
+$$\mathbf{18.5\% \text{ Complete (P0 Scope: 5 / 27 Tickets Completed)}}$$
 
 | Phase | Phase Name | Status | % Complete | Done / Total |
 | :---: | :--- | :---: | :---: | :---: |
 | **Phase 0** | Project Setup & Architecture | Completed | 100% | 4 / 4 (P0) |
-| **Phase 1** | Core Product & Invoicing | In Progress | 0% | 0 / 7 (P0) |
+| **Phase 1** | Core Product & Invoicing | In Progress | 14.3% | 1 / 7 (P0) |
 | **Phase 2** | Payment Chaser Engine | Pending | 0% | 0 / 3 (P0) |
 | **Phase 3** | Dashboard Cockpit | Pending | 0% | 0 / 1 (P0) |
 | **Phase 4** | Local Notifications | Pending | 0% | 0 / 2 (P0) |
 | **Phase 5** | Monetization & RevenueCat | Pending | 0% | 0 / 4 (P0) |
 | **Phase 6** | Release Readiness & Store | Pending | 0% | 0 / 6 (P0) |
 | **Phase 7** | Post-P0 / Time-Permitting | Deferred | 0% | 0 / 10 (P1/P2) |
-| **TOTAL** | | | **10.8%** | **4 / 37** |
+| **TOTAL** | | | **13.5%** | **5 / 37** |
 
 ---
 
 ## Active Status
 
-- **Currently Working On**: Phase 0 complete. Ready to begin Phase 1: Core Product & Data Pipelines (starting with FT-005: Authentication & Session Management).
-- **Next Up**: FT-005 (Authentication & Session Management), FT-006 (Onboarding & Profile Setup).
+- **Currently Working On**: FT-005 (Authentication & Session Management) completed. Ready to proceed with FT-006 (Profile Setup & Business Onboarding).
+- **Next Up**: FT-006 (Profile Setup & Business Onboarding), FT-007 (Client Management CRUD).
 - **Blockers**: None.
 
 ---
@@ -58,7 +58,7 @@ $$\mathbf{14.8\% \text{ Complete (P0 Scope: 4 / 27 Tickets Completed)}}$$
 - [x] **FT-004**: Firebase Initialization & Firestore Rules Setup (P0)
 
 ### Phase 1: Core Product & Data Pipelines
-- [ ] **FT-005**: Authentication & Session Management (P0)
+- [x] **FT-005**: Authentication & Session Management (P0)
 - [ ] **FT-006**: Onboarding Carousel & Profile Setup (P0)
 - [ ] **FT-007**: Client Management (CRUD & Directory) (P0)
 - [ ] **FT-008**: Project Management (CRUD & Client Linking) (P0)
@@ -166,3 +166,4 @@ $$\mathbf{14.8\% \text{ Complete (P0 Scope: 4 / 27 Tickets Completed)}}$$
 - **2026-10-01**: Phase 0 Foundation completed: verified dependencies added to `pubspec.yaml`, design system tokens and Inter typography implemented in `lib/app/theme/`, go_router shell route with 5-tab persistent bottom navigation registered, core UI components built, `firestore.rules` deployed, and smoke test passed with 0 analyzer issues.
 - **2026-10-01**: Screen 01 Splash implemented in `lib/features/onboarding/presentation/splash_screen.dart` matching `visily-01-splash.png`. Features 3-second display of logo and tagline with smooth entrance animation before smoothly revealing the "Get Started" and "Log In" actions. Router and automated widget tests verified.
 - **2026-10-01**: Screen 02 Onboarding implemented in `lib/features/onboarding/presentation/onboarding_screen.dart` matching `visily-02-onboarding.png` and incorporating the 3 new assets (`onboarding1.jpeg`, `onboarding2.jpeg`, `onboarding3.jpeg`). Features smooth carousel, animated indicator pills, Skip and Next/Get Started actions navigating to `/auth/signup`. Automated widget test passes.
+- **2026-10-01**: FT-005 completed: Screen 03 Sign Up and Screen 04 Login built in `lib/features/auth/presentation/` adhering to `visily-03-sign-up.png` and `visily-04-login.png`. Features email and password validation, remember me toggle, custom Google branded button, legal disclaimer, Firebase Auth repository integration, and end-to-end automated widget test coverage. 0 analyzer warnings.
