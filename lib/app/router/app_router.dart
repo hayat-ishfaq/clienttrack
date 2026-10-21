@@ -16,6 +16,7 @@ import '../../features/clients/presentation/client_list_screen.dart';
 import '../../features/clients/presentation/add_edit_client_screen.dart';
 import '../../features/clients/presentation/client_detail_screen.dart';
 import '../../features/projects/presentation/project_list_screen.dart';
+import '../../features/invoices/presentation/create_invoice_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final GlobalKey<NavigatorState> _homeNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'home');
@@ -185,11 +186,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.createInvoice,
         name: AppRoutes.createInvoiceName,
-        builder: (context, state) => const PlaceholderScreen(
-          title: 'Create Invoice',
-          subtitle: 'Draft a new invoice with itemized line items.',
-          icon: Icons.post_add_outlined,
-        ),
+        builder: (context, state) => const CreateInvoiceScreen(),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
