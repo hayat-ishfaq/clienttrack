@@ -17,6 +17,7 @@ import '../../features/clients/presentation/add_edit_client_screen.dart';
 import '../../features/clients/presentation/client_detail_screen.dart';
 import '../../features/projects/presentation/project_list_screen.dart';
 import '../../features/projects/presentation/new_project_screen.dart';
+import '../../features/projects/presentation/project_detail_screen.dart';
 import '../../features/invoices/presentation/create_invoice_screen.dart';
 import '../../features/invoices/presentation/invoice_detail_screen.dart';
 import '../../features/invoices/presentation/pdf_preview_screen.dart';
@@ -163,10 +164,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.projectDetail,
         name: AppRoutes.projectDetailName,
-        builder: (context, state) => PlaceholderScreen(
-          title: 'Project Details',
-          subtitle: 'Project: ${state.pathParameters['id']}',
-          icon: Icons.folder_open_outlined,
+        builder: (context, state) => ProjectDetailScreen(
+          projectId: state.pathParameters['id'] ?? 'p1',
         ),
       ),
       GoRoute(
