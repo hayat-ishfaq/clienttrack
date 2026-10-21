@@ -20,6 +20,7 @@ import '../../features/invoices/presentation/create_invoice_screen.dart';
 import '../../features/invoices/presentation/invoice_detail_screen.dart';
 import '../../features/invoices/presentation/pdf_preview_screen.dart';
 import '../../features/chaser/presentation/needs_follow_up_screen.dart';
+import '../../features/settings/presentation/business_profile_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final GlobalKey<NavigatorState> _homeNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'home');
@@ -241,11 +242,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.businessProfile,
         name: AppRoutes.businessProfileName,
-        builder: (context, state) => const PlaceholderScreen(
-          title: 'Business Profile',
-          subtitle: 'Manage your business address and invoice header details.',
-          icon: Icons.storefront_outlined,
-        ),
+        builder: (context, state) => const BusinessProfileScreen(),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
