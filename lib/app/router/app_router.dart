@@ -16,9 +16,11 @@ import '../../features/clients/presentation/client_list_screen.dart';
 import '../../features/clients/presentation/add_edit_client_screen.dart';
 import '../../features/clients/presentation/client_detail_screen.dart';
 import '../../features/projects/presentation/project_list_screen.dart';
+import '../../features/projects/presentation/new_project_screen.dart';
 import '../../features/invoices/presentation/create_invoice_screen.dart';
 import '../../features/invoices/presentation/invoice_detail_screen.dart';
 import '../../features/invoices/presentation/pdf_preview_screen.dart';
+import '../../features/invoices/presentation/invoices_screen.dart';
 import '../../features/chaser/presentation/needs_follow_up_screen.dart';
 import '../../features/settings/presentation/business_profile_screen.dart';
 import '../../features/paywall/presentation/paywall_screen.dart';
@@ -119,11 +121,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: AppRoutes.invoices,
                 name: AppRoutes.invoicesName,
-                builder: (context, state) => const PlaceholderScreen(
-                  title: 'Invoices',
-                  subtitle: 'Ledger of all draft, sent, and paid invoices.',
-                  icon: Icons.description_outlined,
-                ),
+                builder: (context, state) => const InvoicesScreen(),
               ),
             ],
           ),
@@ -159,11 +157,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.addProject,
         name: AppRoutes.addProjectName,
-        builder: (context, state) => const PlaceholderScreen(
-          title: 'Add Project',
-          subtitle: 'Create a new project scope.',
-          icon: Icons.create_new_folder_outlined,
-        ),
+        builder: (context, state) => const NewProjectScreen(),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
@@ -179,10 +173,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.editProject,
         name: AppRoutes.editProjectName,
-        builder: (context, state) => PlaceholderScreen(
-          title: 'Edit Project',
-          subtitle: 'Edit project: ${state.pathParameters['id']}',
-          icon: Icons.edit_note_outlined,
+        builder: (context, state) => NewProjectScreen(
+          projectId: state.pathParameters['id'],
         ),
       ),
 
