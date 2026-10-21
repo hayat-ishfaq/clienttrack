@@ -15,6 +15,7 @@ import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/clients/presentation/client_list_screen.dart';
 import '../../features/clients/presentation/add_edit_client_screen.dart';
 import '../../features/clients/presentation/client_detail_screen.dart';
+import '../../features/projects/presentation/project_list_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final GlobalKey<NavigatorState> _homeNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'home');
@@ -101,11 +102,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: AppRoutes.projects,
                 name: AppRoutes.projectsName,
-                builder: (context, state) => const PlaceholderScreen(
-                  title: 'Projects',
-                  subtitle: 'Active deliverables, milestones, and deadlines.',
-                  icon: Icons.work_outline_rounded,
-                ),
+                builder: (context, state) => const ProjectListScreen(),
               ),
             ],
           ),
