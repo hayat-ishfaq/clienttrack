@@ -4,6 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/router/route_names.dart';
 import '../../../app/theme/app_colors.dart';
+import '../../invoices/data/invoice_repository.dart';
+import '../../invoices/domain/models/invoice_model.dart';
+import '../data/project_repository.dart';
+import '../domain/models/project_model.dart';
 
 // ---------------------------------------------------------------------------
 // Screen: Project Details
@@ -24,27 +28,26 @@ class ProjectDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
-  // Demo data matching Visily mockup
-  final String _title = 'Website Redesign';
-  final String _status = 'IN PROGRESS';
-  final String _description =
-      'Full redesign of the Brightside Cafe marketing site, including a new CMS integration and mobile-responsive menu layouts.';
+  ProjectModel? _currentProject;
 
-  final String _clientName = 'Sarah Johnson';
-  final String _clientCompany = 'Brightside Cafe';
-  final String _clientId = 'c1';
+  String _formatBudget(double amount) {
+    final s = amount.round().toString();
+    if (s.length > 3) {
+      return '\$${s.substring(0, s.length - 3)},${s.substring(s.length - 3)}';
+    }
+    return '\$$s';
+  }
 
-  final String _deadline = 'Due tomorrow';
-  final String _rateType = 'FIXED RATE';
-  final String _rateAmount = '\$1,200';
-
-  // Linked invoice
-  final String _linkedInvoiceId = '1023';
-  final String _linkedInvoiceNumber = '#1023';
-  final String _linkedInvoiceTitle = 'Initial Deposit';
-  final String _linkedInvoiceStatus = 'OVERDUE';
-  final String _linkedInvoiceStatusDetail = '3 days late';
-  final String _linkedInvoiceAmount = '\$450.00';
+  String _formatDeadline(DateTime? deadline) {
+    if (deadline == null) return 'No deadline';
+    final now = DateTime.now();
+    final diff = deadline.difference(now).inDays;
+    if (diff == 0) return 'Due today';
+    if (diff == 1) return 'Due tomorrow';
+    if (diff < 0) return '${-diff}d overdue';
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${months[deadline.month - 1]} ${deadline.day}, ${deadline.year}';
+  }
 
   Future<void> _showMoreMenu(TapDownDetails details) async {
     final RenderBox overlay =
@@ -132,11 +135,12 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         ),
       );
     } else if (value == 'delete') {
-      _confirmDelete();
+      _confirmDelete(_currentProject);
     }
   }
 
-  void _confirmDelete() {
+  void _confirmDelete(ProjectModel? project) {
+    final title = project?.title ?? 'Project';
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -146,7 +150,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700),
         ),
         content: Text(
-          'Are you sure you want to delete "$_title"? All associated task data will be removed.',
+          'Are you sure you want to delete "$title"? All associated task data will be removed.',
           style: const TextStyle(fontFamily: 'Inter', color: AppColors.textSecondary),
         ),
         actions: [
@@ -155,9 +159,14 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              context.pop();
+              if (project != null) {
+                await ref.read(projectRepositoryProvider).deleteProject(project.id);
+              }
+              if (mounted) {
+                context.pop();
+              }
             },
             child: const Text('Delete', style: TextStyle(color: AppColors.overdueRed)),
           ),
@@ -168,6 +177,23 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final projectAsync = ref.watch(projectByIdProvider(widget.projectId));
+    final project = projectAsync.asData?.value;
+    _currentProject = project;
+
+    final invoicesAsync = ref.watch(clientInvoicesStreamProvider(project?.clientId ?? ''));
+    final invoices = invoicesAsync.asData?.value ?? [];
+    final linkedInvoice = invoices.isNotEmpty ? invoices.first : null;
+
+    final title = project?.title ?? 'Website Redesign';
+    final status = project?.status.label.toUpperCase() ?? 'IN PROGRESS';
+    final description = project?.description ?? '';
+    final clientName = project?.clientName ?? 'Sarah Johnson';
+    final clientId = project?.clientId ?? '';
+    final deadline = _formatDeadline(project?.deadline);
+    final rateType = project?.rateType == RateType.hourly ? 'HOURLY RATE' : 'FIXED RATE';
+    final rateAmount = _formatBudget(project?.budget ?? 1200.0);
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: _buildAppBar(),
@@ -181,19 +207,19 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Hero Header: Title & Status Badge
-                  _buildHeaderSection(),
+                  _buildHeaderSection(title, status),
                   const SizedBox(height: 12),
                   // Description
-                  _buildDescriptionSection(),
+                  _buildDescriptionSection(description),
                   const SizedBox(height: 20),
                   // Client Card
-                  _buildClientCard(),
+                  _buildClientCard(clientName, clientId),
                   const SizedBox(height: 16),
                   // Two-Column Stats Row: Deadline & Fixed Rate
-                  _buildTwoColumnStatsRow(),
+                  _buildTwoColumnStatsRow(deadline, rateType, rateAmount),
                   const SizedBox(height: 24),
                   // Linked Invoices Section
-                  _buildLinkedInvoicesSection(),
+                  _buildLinkedInvoicesSection(linkedInvoice, invoices.length),
                   const SizedBox(height: 20),
                   // Efficiency Insight Card
                   _buildEfficiencyInsightCard(),
@@ -247,14 +273,14 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   // ── Header Section ─────────────────────────────────────────────────────────
 
-  Widget _buildHeaderSection() {
+  Widget _buildHeaderSection(String title, String status) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
           child: Text(
-            _title,
+            title,
             style: const TextStyle(
               fontFamily: 'Inter',
               fontSize: 24,
@@ -273,7 +299,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
-            _status,
+            status,
             style: const TextStyle(
               fontFamily: 'Inter',
               fontSize: 10,
@@ -289,9 +315,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   // ── Description Section ────────────────────────────────────────────────────
 
-  Widget _buildDescriptionSection() {
+  Widget _buildDescriptionSection(String description) {
     return Text(
-      _description,
+      description.isNotEmpty
+          ? description
+          : 'No description provided for this project.',
       style: const TextStyle(
         fontFamily: 'Inter',
         fontSize: 13,
@@ -303,13 +331,25 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   // ── Client Card ────────────────────────────────────────────────────────────
 
-  Widget _buildClientCard() {
+  Widget _buildClientCard(String clientName, String clientId) {
+    final initials = clientName.trim().isNotEmpty
+        ? clientName
+            .trim()
+            .split(' ')
+            .map((e) => e.isNotEmpty ? e[0] : '')
+            .take(2)
+            .join()
+            .toUpperCase()
+        : 'CL';
+
     return InkWell(
       onTap: () {
-        context.pushNamed(
-          AppRoutes.clientDetailName,
-          pathParameters: {'id': _clientId},
-        );
+        if (clientId.isNotEmpty) {
+          context.pushNamed(
+            AppRoutes.clientDetailName,
+            pathParameters: {'id': clientId},
+          );
+        }
       },
       borderRadius: BorderRadius.circular(16),
       child: Container(
@@ -332,9 +372,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             CircleAvatar(
               radius: 22,
               backgroundColor: const Color(0xFF1E293B),
-              child: const Text(
-                'SJ',
-                style: TextStyle(
+              child: Text(
+                initials,
+                style: const TextStyle(
                   fontFamily: 'Inter',
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
@@ -360,7 +400,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    _clientName,
+                    clientName,
                     style: const TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 15,
@@ -368,9 +408,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  Text(
-                    _clientCompany,
-                    style: const TextStyle(
+                  const Text(
+                    'Tap to view client profile',
+                    style: TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 12,
                       color: AppColors.textSecondary,
@@ -392,7 +432,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   // ── Two-Column Stats Row ───────────────────────────────────────────────────
 
-  Widget _buildTwoColumnStatsRow() {
+  Widget _buildTwoColumnStatsRow(
+      String deadline, String rateType, String rateAmount) {
     return Row(
       children: [
         // Column 1: Deadline Card
@@ -433,7 +474,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  _deadline,
+                  deadline,
                   style: const TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 14,
@@ -473,7 +514,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  _rateType,
+                  rateType,
                   style: const TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 10,
@@ -484,7 +525,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  _rateAmount,
+                  rateAmount,
                   style: const TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 16,
@@ -502,7 +543,45 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   // ── Linked Invoices Section ────────────────────────────────────────────────
 
-  Widget _buildLinkedInvoicesSection() {
+  Widget _buildLinkedInvoicesSection(
+      InvoiceModel? linkedInvoice, int totalInvoices) {
+    if (linkedInvoice == null) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.receipt_long_outlined,
+                color: AppColors.textTertiary, size: 28),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'No invoices generated for this client yet.',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final invoiceNumber = linkedInvoice.invoiceNumber;
+    final invoiceTitle = 'Invoice $invoiceNumber';
+    final invoiceStatus = linkedInvoice.status.name.toUpperCase();
+    final isOverdue = linkedInvoice.isOverdue;
+    final statusDetail = isOverdue
+        ? '${linkedInvoice.daysOverdue} days late'
+        : linkedInvoice.status.name;
+    final amountText = '\$${linkedInvoice.totalAmount.toStringAsFixed(2)}';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -525,9 +604,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 color: const Color(0xFFF1F5F9),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const Text(
-                '1 total',
-                style: TextStyle(
+              child: Text(
+                '$totalInvoices total',
+                style: const TextStyle(
                   fontFamily: 'Inter',
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
@@ -543,7 +622,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           onTap: () {
             context.pushNamed(
               AppRoutes.invoiceDetailName,
-              pathParameters: {'id': _linkedInvoiceId},
+              pathParameters: {'id': linkedInvoice.id},
             );
           },
           borderRadius: BorderRadius.circular(16),
@@ -586,7 +665,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                       Row(
                         children: [
                           Text(
-                            '$_linkedInvoiceNumber ',
+                            '$invoiceNumber ',
                             style: const TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 12,
@@ -595,7 +674,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                             ),
                           ),
                           Text(
-                            _linkedInvoiceTitle,
+                            invoiceTitle,
                             style: const TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 14,
@@ -614,26 +693,32 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFEE2E2),
+                              color: isOverdue
+                                  ? const Color(0xFFFEE2E2)
+                                  : AppColors.paidTealBg,
                               borderRadius: BorderRadius.circular(5),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.access_time_rounded,
                                   size: 10,
-                                  color: Color(0xFFEF4444),
+                                  color: isOverdue
+                                      ? const Color(0xFFEF4444)
+                                      : AppColors.paidTeal,
                                 ),
                                 const SizedBox(width: 3),
                                 Text(
-                                  _linkedInvoiceStatus,
-                                  style: const TextStyle(
+                                  invoiceStatus,
+                                  style: TextStyle(
                                     fontFamily: 'Inter',
                                     fontSize: 9,
                                     fontWeight: FontWeight.w800,
                                     letterSpacing: 0.3,
-                                    color: Color(0xFFEF4444),
+                                    color: isOverdue
+                                        ? const Color(0xFFEF4444)
+                                        : AppColors.paidTeal,
                                   ),
                                 ),
                               ],
@@ -641,7 +726,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            _linkedInvoiceStatusDetail,
+                            statusDetail,
                             style: const TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 11,
@@ -658,7 +743,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      _linkedInvoiceAmount,
+                      amountText,
                       style: const TextStyle(
                         fontFamily: 'Inter',
                         fontSize: 15,

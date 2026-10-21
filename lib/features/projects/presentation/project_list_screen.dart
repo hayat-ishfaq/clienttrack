@@ -5,134 +5,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/router/route_names.dart';
 import '../../../app/theme/app_colors.dart';
-
-// ---------------------------------------------------------------------------
-// Demo data — replaced by Firestore in FT-008
-// ---------------------------------------------------------------------------
-
-enum _ProjectStatus { inProgress, planning, completed, onHold }
-
-class _DemoProject {
-  final String id;
-  final String title;
-  final String clientName;
-  final _ProjectStatus status;
-  final String deadline;
-  final double progressPct; // 0.0 – 1.0
-  final int budget;
-
-  const _DemoProject({
-    required this.id,
-    required this.title,
-    required this.clientName,
-    required this.status,
-    required this.deadline,
-    required this.progressPct,
-    required this.budget,
-  });
-}
-
-const _kDemoProjects = <_DemoProject>[
-  _DemoProject(
-    id: 'p1',
-    title: 'Brand Identity Design',
-    clientName: 'Lafar & Reed',
-    status: _ProjectStatus.inProgress,
-    deadline: 'Oct 24, 2023',
-    progressPct: 0.65,
-    budget: 3200,
-  ),
-  _DemoProject(
-    id: 'p2',
-    title: 'Mobile App Wireframes',
-    clientName: 'Summit Group',
-    status: _ProjectStatus.planning,
-    deadline: 'Nov 05, 2023',
-    progressPct: 0.18,
-    budget: 1850,
-  ),
-  _DemoProject(
-    id: 'p3',
-    title: 'E-commerce Website',
-    clientName: 'Silica House',
-    status: _ProjectStatus.completed,
-    deadline: 'Oct 14, 2023',
-    progressPct: 1.0,
-    budget: 5000,
-  ),
-  _DemoProject(
-    id: 'p4',
-    title: 'Social Media Campaign',
-    clientName: 'Norwood',
-    status: _ProjectStatus.inProgress,
-    deadline: 'Oct 29, 2023',
-    progressPct: 0.40,
-    budget: 2200,
-  ),
-  _DemoProject(
-    id: 'p5',
-    title: 'Q4 Financial Report',
-    clientName: 'Acme Accounting',
-    status: _ProjectStatus.onHold,
-    deadline: 'Nov 16, 2023',
-    progressPct: 0.22,
-    budget: 1200,
-  ),
-  _DemoProject(
-    id: 'p6',
-    title: 'Landing Page Optimization',
-    clientName: 'Franklin Marketing Co.',
-    status: _ProjectStatus.inProgress,
-    deadline: 'Oct 30, 2023',
-    progressPct: 0.80,
-    budget: 950,
-  ),
-  _DemoProject(
-    id: 'p7',
-    title: 'Annual Report Design',
-    clientName: 'Urbanery NGO',
-    status: _ProjectStatus.planning,
-    deadline: 'Nov 21, 2023',
-    progressPct: 0.08,
-    budget: 4500,
-  ),
-  _DemoProject(
-    id: 'p8',
-    title: 'SEO Strategy Phase 1',
-    clientName: 'Larad Serv.',
-    status: _ProjectStatus.completed,
-    deadline: 'Nov 30, 2023',
-    progressPct: 1.0,
-    budget: 1500,
-  ),
-  _DemoProject(
-    id: 'p9',
-    title: 'Product Photography',
-    clientName: 'Isarith Walser',
-    status: _ProjectStatus.inProgress,
-    deadline: 'Nov 10, 2023',
-    progressPct: 0.35,
-    budget: 2800,
-  ),
-  _DemoProject(
-    id: 'p10',
-    title: 'Content Strategy',
-    clientName: 'Patch Finder',
-    status: _ProjectStatus.completed,
-    deadline: 'Nov 13, 2023',
-    progressPct: 0.99,
-    budget: 1200,
-  ),
-  _DemoProject(
-    id: 'p11',
-    title: 'Backend Integration',
-    clientName: 'Framework Solutions',
-    status: _ProjectStatus.planning,
-    deadline: 'Nov 15, 2023',
-    progressPct: 0.0,
-    budget: 6200,
-  ),
-];
+import '../data/project_repository.dart';
+import '../domain/models/project_model.dart';
 
 // ---------------------------------------------------------------------------
 // Filter enum
@@ -189,18 +63,16 @@ class _ProjectListScreenState extends ConsumerState<ProjectListScreen> {
     setState(() => _query = _searchCtrl.text.toLowerCase().trim());
   }
 
-  List<_DemoProject> get _filtered {
-    return _kDemoProjects.where((p) {
-      // Filter tab
+  List<ProjectModel> _filterList(List<ProjectModel> projects) {
+    return projects.where((p) {
       final matchesTab = switch (_activeFilter) {
         _FilterTab.all => true,
-        _FilterTab.active => p.status == _ProjectStatus.inProgress ||
-            p.status == _ProjectStatus.onHold,
-        _FilterTab.completed => p.status == _ProjectStatus.completed,
-        _FilterTab.planning => p.status == _ProjectStatus.planning,
+        _FilterTab.active => p.status == ProjectStatus.inProgress ||
+            p.status == ProjectStatus.onHold,
+        _FilterTab.completed => p.status == ProjectStatus.completed,
+        _FilterTab.planning => p.status == ProjectStatus.planning,
       };
 
-      // Search query
       final matchesQuery = _query.isEmpty ||
           p.title.toLowerCase().contains(_query) ||
           p.clientName.toLowerCase().contains(_query);
@@ -209,13 +81,13 @@ class _ProjectListScreenState extends ConsumerState<ProjectListScreen> {
     }).toList();
   }
 
-  int _countFor(_FilterTab tab) => _kDemoProjects.where((p) {
+  int _countFor(_FilterTab tab, List<ProjectModel> projects) => projects.where((p) {
         return switch (tab) {
           _FilterTab.all => true,
-          _FilterTab.active => p.status == _ProjectStatus.inProgress ||
-              p.status == _ProjectStatus.onHold,
-          _FilterTab.completed => p.status == _ProjectStatus.completed,
-          _FilterTab.planning => p.status == _ProjectStatus.planning,
+          _FilterTab.active => p.status == ProjectStatus.inProgress ||
+              p.status == ProjectStatus.onHold,
+          _FilterTab.completed => p.status == ProjectStatus.completed,
+          _FilterTab.planning => p.status == ProjectStatus.planning,
         };
       }).length;
 
@@ -223,7 +95,9 @@ class _ProjectListScreenState extends ConsumerState<ProjectListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final results = _filtered;
+    final projectsAsync = ref.watch(projectsStreamProvider);
+    final allProjects = projectsAsync.asData?.value ?? kSeedProjects;
+    final results = _filterList(allProjects);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
@@ -246,7 +120,7 @@ class _ProjectListScreenState extends ConsumerState<ProjectListScreen> {
                         children: [
                           _buildSearchRow(),
                           const SizedBox(height: 14),
-                          _buildFilterChips(),
+                          _buildFilterChips(allProjects),
                           const SizedBox(height: 16),
                         ],
                       ),
@@ -384,13 +258,13 @@ class _ProjectListScreenState extends ConsumerState<ProjectListScreen> {
     );
   }
 
-  Widget _buildFilterChips() {
+  Widget _buildFilterChips(List<ProjectModel> projects) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
         children: _FilterTab.values.map((tab) {
           final isActive = tab == _activeFilter;
-          final count = _countFor(tab);
+          final count = _countFor(tab, projects);
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: GestureDetector(
@@ -532,46 +406,60 @@ class _ProjectListScreenState extends ConsumerState<ProjectListScreen> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _ProjectCard extends StatelessWidget {
-  final _DemoProject project;
+  final ProjectModel project;
   final VoidCallback onTap;
 
   const _ProjectCard({required this.project, required this.onTap});
 
   // Status appearance helpers
   Color get _statusBg => switch (project.status) {
-        _ProjectStatus.inProgress => AppColors.paidTealBg,
-        _ProjectStatus.planning => AppColors.dueSoonAmberBg,
-        _ProjectStatus.completed => const Color(0xFFE8F7F0),
-        _ProjectStatus.onHold => AppColors.draftGreyBg,
+        ProjectStatus.notStarted => AppColors.draftGreyBg,
+        ProjectStatus.inProgress => AppColors.paidTealBg,
+        ProjectStatus.planning => AppColors.dueSoonAmberBg,
+        ProjectStatus.completed => const Color(0xFFE8F7F0),
+        ProjectStatus.onHold => AppColors.draftGreyBg,
       };
 
   Color get _statusFg => switch (project.status) {
-        _ProjectStatus.inProgress => AppColors.accentTealGreen,
-        _ProjectStatus.planning => AppColors.dueSoonAmber,
-        _ProjectStatus.completed => AppColors.paidTeal,
-        _ProjectStatus.onHold => AppColors.draftGrey,
+        ProjectStatus.notStarted => AppColors.draftGrey,
+        ProjectStatus.inProgress => AppColors.accentTealGreen,
+        ProjectStatus.planning => AppColors.dueSoonAmber,
+        ProjectStatus.completed => AppColors.paidTeal,
+        ProjectStatus.onHold => AppColors.draftGrey,
       };
 
   Color get _progressColor => switch (project.status) {
-        _ProjectStatus.inProgress => AppColors.accentTealGreen,
-        _ProjectStatus.planning => AppColors.dueSoonAmber,
-        _ProjectStatus.completed => AppColors.paidTeal,
-        _ProjectStatus.onHold => AppColors.draftGrey,
+        ProjectStatus.notStarted => AppColors.draftGrey,
+        ProjectStatus.inProgress => AppColors.accentTealGreen,
+        ProjectStatus.planning => AppColors.dueSoonAmber,
+        ProjectStatus.completed => AppColors.paidTeal,
+        ProjectStatus.onHold => AppColors.draftGrey,
       };
 
   String get _statusLabel => switch (project.status) {
-        _ProjectStatus.inProgress => 'IN PROGRESS',
-        _ProjectStatus.planning => 'PLANNING',
-        _ProjectStatus.completed => 'COMPLETED',
-        _ProjectStatus.onHold => 'ON HOLD',
+        ProjectStatus.notStarted => 'NOT STARTED',
+        ProjectStatus.inProgress => 'IN PROGRESS',
+        ProjectStatus.planning => 'PLANNING',
+        ProjectStatus.completed => 'COMPLETED',
+        ProjectStatus.onHold => 'ON HOLD',
       };
 
-  String _formatBudget(int amount) {
-    final s = amount.toString();
+  String _formatBudget(double amount) {
+    final s = amount.round().toString();
     if (s.length > 3) {
       return '\$${s.substring(0, s.length - 3)},${s.substring(s.length - 3)}';
     }
     return '\$$s';
+  }
+
+  String get _deadlineText {
+    if (project.deadline == null) return 'No deadline';
+    final d = project.deadline!;
+    final months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return '${months[d.month - 1]} ${d.day.toString().padLeft(2, '0')}, ${d.year}';
   }
 
   @override
@@ -667,7 +555,7 @@ class _ProjectCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        project.deadline,
+                        _deadlineText,
                         style: const TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 11.5,

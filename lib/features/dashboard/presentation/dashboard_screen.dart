@@ -2,9 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:intl/intl.dart';
+
 import '../../../app/router/route_names.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../invoices/data/invoice_repository.dart';
+import '../../invoices/domain/models/invoice_model.dart';
+import '../../projects/data/project_repository.dart';
+import '../../projects/domain/models/project_model.dart';
+import '../../settings/data/business_profile_repository.dart';
 
 /// Screen 07: Main Dashboard Screen.
 /// Pixel-perfect implementation conforming to visily-07-dashboard.png.
@@ -198,6 +205,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final invoicesAsync = ref.watch(invoicesStreamProvider);
+    final projectsAsync = ref.watch(projectsStreamProvider);
+    final profileAsync = ref.watch(businessProfileStreamProvider);
+
+    final invoices = invoicesAsync.asData?.value ?? kSeedInvoices;
+    final projects = projectsAsync.asData?.value ?? kSeedProjects;
+    final profile = profileAsync.asData?.value;
+
+    final userName = (profile != null && profile.fullName.trim().isNotEmpty)
+        ? profile.fullName
+        : _userName;
+    final logoUrl = profile?.logoUrl;
+
+    final openInvoices = invoices.where((i) => i.status != InvoiceStatus.paid).toList();
+    final overdueInvoices = invoices.where((i) => i.isOverdue || i.status == InvoiceStatus.overdue).toList();
+    final totalBalance = invoices.fold<double>(0.0, (sum, i) => sum + i.balanceDue);
+    final activeProjects = projects.where((p) => p.status != ProjectStatus.completed).toList();
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       body: SafeArea(
@@ -209,27 +234,33 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 1. Top Header Bar (User Avatar, Greeting, Notification, More)
-              _buildTopHeader(context),
+              _buildTopHeader(context, userName, logoUrl, overdueInvoices.length),
               const SizedBox(height: 20),
 
               // 2. Weekly Balance Hero Card
-              _buildWeeklyBalanceCard(context),
+              _buildWeeklyBalanceCard(context, totalBalance),
               const SizedBox(height: 16),
 
               // 3. Metric Cards (Active Projects & Open Invoices)
-              _buildMetricsRow(context),
+              _buildMetricsRow(
+                context,
+                activeProjectsCount: activeProjects.length,
+                totalProjectsCount: projects.length,
+                openInvoicesCount: openInvoices.length,
+                overdueInvoicesCount: overdueInvoices.length,
+              ),
               const SizedBox(height: 20),
 
               // 4. Needs Follow-up Alert Card
-              _buildNeedsFollowUpCard(context),
+              _buildNeedsFollowUpCard(context, overdueInvoices.length),
               const SizedBox(height: 24),
 
               // 5. Deadlines Section
-              _buildDeadlinesSection(context),
+              _buildDeadlinesSection(context, projects),
               const SizedBox(height: 24),
 
               // 6. Recent Invoices Section
-              _buildRecentInvoicesSection(context),
+              _buildRecentInvoicesSection(context, invoices),
               const SizedBox(height: 24),
 
               // 7. Quick Actions Section
@@ -242,7 +273,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   /// 1. Top Header Bar
-  Widget _buildTopHeader(BuildContext context) {
+  Widget _buildTopHeader(
+    BuildContext context,
+    String userName,
+    String? logoUrl,
+    int overdueCount,
+  ) {
+    final initials = userName.trim().isNotEmpty
+        ? userName
+            .trim()
+            .split(' ')
+            .map((s) => s.isNotEmpty ? s[0].toUpperCase() : '')
+            .take(2)
+            .join()
+        : 'CT';
+
     return Row(
       children: [
         // Avatar with Active Indicator
@@ -256,7 +301,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 height: 48,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFFE2E8F0),
+                  color: const Color(0xFF1E293B),
                   border: Border.all(color: Colors.white, width: 2),
                   boxShadow: [
                     BoxShadow(
@@ -266,11 +311,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
                   ],
                 ),
-                child: const Center(
-                  child: Icon(
-                    Icons.image_outlined,
-                    color: Color(0xFF94A3B8),
-                    size: 24,
+                child: Center(
+                  child: Text(
+                    initials,
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -307,7 +356,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ),
               const SizedBox(height: 2),
               Text(
-                _userName,
+                userName,
                 style: const TextStyle(
                   fontFamily: 'Inter',
                   fontSize: 18,
@@ -320,9 +369,35 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ),
         ),
         // Notification Button
-        _buildCircularIconButton(
-          icon: Icons.notifications_none_rounded,
-          onTap: () => _showNotificationSheet(context),
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            _buildCircularIconButton(
+              icon: Icons.notifications_none_rounded,
+              onTap: () => _showNotificationSheet(context),
+            ),
+            if (overdueCount > 0)
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFDC2626),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    overdueCount > 9 ? '9+' : '$overdueCount',
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
         const SizedBox(width: 10),
         // More Options Button
@@ -365,7 +440,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   /// 2. Weekly Balance Hero Card
-  Widget _buildWeeklyBalanceCard(BuildContext context) {
+  Widget _buildWeeklyBalanceCard(BuildContext context, double totalBalance) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(22),
@@ -398,7 +473,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               borderRadius: BorderRadius.circular(20),
             ),
             child: const Text(
-              'June Overview',
+              'Live Overview',
               style: TextStyle(
                 fontFamily: 'Inter',
                 color: Colors.white,
@@ -411,7 +486,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           const SizedBox(height: 16),
           // Weekly Balance Title
           Text(
-            'Weekly Balance',
+            'Outstanding Balance',
             style: TextStyle(
               fontFamily: 'Inter',
               color: Colors.white.withValues(alpha: 0.9),
@@ -422,9 +497,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ),
           const SizedBox(height: 6),
           // Large Amount
-          const Text(
-            r'$8,420.00',
-            style: TextStyle(
+          Text(
+            '\$${totalBalance.toStringAsFixed(2)}',
+            style: const TextStyle(
               fontFamily: 'Inter',
               color: Colors.white,
               fontSize: 34,
@@ -433,17 +508,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          // Percentage / Trend Row
+          // Trend Row
           Row(
             children: [
               Icon(
-                Icons.north_east_rounded,
+                Icons.sync_rounded,
                 size: 15,
                 color: Colors.white.withValues(alpha: 0.85),
               ),
               const SizedBox(width: 4),
               Text(
-                '+12% vs last month',
+                'Synced with Cloud Firestore',
                 style: TextStyle(
                   fontFamily: 'Inter',
                   color: Colors.white.withValues(alpha: 0.85),
@@ -459,7 +534,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   /// 3. Metric Cards (Active Projects & Open Invoices)
-  Widget _buildMetricsRow(BuildContext context) {
+  Widget _buildMetricsRow(
+    BuildContext context, {
+    required int activeProjectsCount,
+    required int totalProjectsCount,
+    required int openInvoicesCount,
+    required int overdueInvoicesCount,
+  }) {
     return Row(
       children: [
         // Left Card: Active Projects
@@ -471,9 +552,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               iconColor: const Color(0xFF0D9488),
               iconBgColor: const Color(0xFFCCFBF1).withValues(alpha: 0.7),
               title: 'Active Projects',
-              value: '12',
+              value: activeProjectsCount.toString().padLeft(2, '0'),
               trendIcon: Icons.trending_up_rounded,
-              trendText: '+2 this week',
+              trendText: '$totalProjectsCount total',
               trendColor: const Color(0xFF0D9488),
             ),
           ),
@@ -488,10 +569,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               iconColor: const Color(0xFF4F46E5),
               iconBgColor: const Color(0xFFEEF2FF),
               title: 'Open Invoices',
-              value: '08',
+              value: openInvoicesCount.toString().padLeft(2, '0'),
               trendIcon: Icons.trending_up_rounded,
-              trendText: '3 overdue',
-              trendColor: const Color(0xFF0D9488),
+              trendText: '$overdueInvoicesCount overdue',
+              trendColor: overdueInvoicesCount > 0 ? const Color(0xFFDC2626) : const Color(0xFF0D9488),
             ),
           ),
         ),
@@ -582,7 +663,35 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   /// 4. Needs Follow-up Alert Card
-  Widget _buildNeedsFollowUpCard(BuildContext context) {
+  Widget _buildNeedsFollowUpCard(BuildContext context, int overdueCount) {
+    if (overdueCount == 0) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0FDF4),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFBBF7D0)),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.check_circle_outline_rounded, color: Color(0xFF16A34A)),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'All caught up! No overdue invoices need follow-up.',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF166534),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFFDF0EF),
@@ -633,23 +742,23 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           ),
                           const SizedBox(width: 14),
                           // Title & Description
-                          const Expanded(
+                          Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Needs Follow-up',
-                                  style: TextStyle(
+                                  'Needs Follow-up ($overdueCount)',
+                                  style: const TextStyle(
                                     fontFamily: 'Inter',
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700,
                                     color: Color(0xFFB91C1C),
                                   ),
                                 ),
-                                SizedBox(height: 4),
+                                const SizedBox(height: 4),
                                 Text(
-                                  'You have 3 invoices overdue by more than 7 days. Clients are waiting for reminders.',
-                                  style: TextStyle(
+                                  'You have $overdueCount ${overdueCount == 1 ? "invoice" : "invoices"} overdue. Clients are waiting for reminders.',
+                                  style: const TextStyle(
                                     fontFamily: 'Inter',
                                     fontSize: 13,
                                     fontWeight: FontWeight.w400,
@@ -707,7 +816,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   /// 5. Deadlines Section
-  Widget _buildDeadlinesSection(BuildContext context) {
+  Widget _buildDeadlinesSection(BuildContext context, List<ProjectModel> projects) {
+    final displayProjects = projects.take(2).toList();
+
     return Column(
       children: [
         // Section Header
@@ -744,40 +855,64 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        // Two Deadline Cards Row
-        Row(
-          children: [
-            // Card 1: Logo Design Package
-            Expanded(
-              child: _buildDeadlineCard(
-                title: 'Logo Design Package',
-                client: 'Nebula Systems',
-                date: 'Jun 14, 2024',
-                tagLabel: 'SOON',
-                tagBgColor: const Color(0xFFDC3535),
-                tagTextColor: Colors.white,
-                clockBgColor: const Color(0xFFFDE8E8),
-                clockColor: const Color(0xFFDC2626),
-                onTap: () => context.go(AppRoutes.projects),
+        if (displayProjects.isEmpty)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'No active projects with deadlines',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                ),
               ),
             ),
-            const SizedBox(width: 14),
-            // Card 2: UI Audit Report
-            Expanded(
-              child: _buildDeadlineCard(
-                title: 'UI Audit Report',
-                client: 'Green Leaf Co.',
-                date: 'Jun 18, 2024',
-                tagLabel: 'UPCOMING',
-                tagBgColor: const Color(0xFFF1F5F9),
-                tagTextColor: const Color(0xFF334155),
-                clockBgColor: const Color(0xFFDCFCE7),
-                clockColor: const Color(0xFF16A34A),
-                onTap: () => context.go(AppRoutes.projects),
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                child: _buildDeadlineCard(
+                  title: displayProjects[0].title,
+                  client: displayProjects[0].clientName,
+                  date: displayProjects[0].deadline != null
+                      ? DateFormat.MMMd().format(displayProjects[0].deadline!)
+                      : 'Ongoing',
+                  tagLabel: displayProjects[0].status == ProjectStatus.inProgress
+                      ? 'SOON'
+                      : displayProjects[0].status.label.toUpperCase(),
+                  tagBgColor: displayProjects[0].status == ProjectStatus.inProgress
+                      ? const Color(0xFFDC3535)
+                      : const Color(0xFFF1F5F9),
+                  tagTextColor: displayProjects[0].status == ProjectStatus.inProgress
+                      ? Colors.white
+                      : const Color(0xFF334155),
+                  clockBgColor: const Color(0xFFFDE8E8),
+                  clockColor: const Color(0xFFDC2626),
+                  onTap: () => context.go(AppRoutes.projects),
+                ),
               ),
-            ),
-          ],
-        ),
+              if (displayProjects.length > 1) ...[
+                const SizedBox(width: 14),
+                Expanded(
+                  child: _buildDeadlineCard(
+                    title: displayProjects[1].title,
+                    client: displayProjects[1].clientName,
+                    date: displayProjects[1].deadline != null
+                        ? DateFormat.MMMd().format(displayProjects[1].deadline!)
+                        : 'Ongoing',
+                    tagLabel: displayProjects[1].status.label.toUpperCase(),
+                    tagBgColor: const Color(0xFFF1F5F9),
+                    tagTextColor: const Color(0xFF334155),
+                    clockBgColor: const Color(0xFFDCFCE7),
+                    clockColor: const Color(0xFF16A34A),
+                    onTap: () => context.go(AppRoutes.projects),
+                  ),
+                ),
+              ],
+            ],
+          ),
       ],
     );
   }
@@ -898,7 +1033,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   /// 6. Recent Invoices Section
-  Widget _buildRecentInvoicesSection(BuildContext context) {
+  Widget _buildRecentInvoicesSection(BuildContext context, List<InvoiceModel> invoices) {
+    final recentInvoices = invoices.take(3).toList();
+
     return Column(
       children: [
         // Section Header
@@ -935,41 +1072,48 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        // Item 1: TechSolutions Inc. - PAID
-        _buildInvoiceItemRow(
-          context: context,
-          client: 'TechSolutions Inc.',
-          invCode: 'INV-2024-001 • Today',
-          amount: r'$1,250.00',
-          status: 'PAID',
-          statusColor: const Color(0xFF0D9488),
-          iconBgColor: const Color(0xFFCCFBF1).withValues(alpha: 0.7),
-          iconColor: const Color(0xFF0D9488),
-        ),
-        const SizedBox(height: 10),
-        // Item 2: Creative Flow - PENDING
-        _buildInvoiceItemRow(
-          context: context,
-          client: 'Creative Flow',
-          invCode: 'INV-2024-002 • Yesterday',
-          amount: r'$840.00',
-          status: 'PENDING',
-          statusColor: const Color(0xFFD97706),
-          iconBgColor: const Color(0xFFFEF3C7),
-          iconColor: const Color(0xFFD97706),
-        ),
-        const SizedBox(height: 10),
-        // Item 3: Apex Holdings - OVERDUE
-        _buildInvoiceItemRow(
-          context: context,
-          client: 'Apex Holdings',
-          invCode: 'INV-2023-098 • 5 days ago',
-          amount: r'$3,400.00',
-          status: 'OVERDUE',
-          statusColor: const Color(0xFFDC2626),
-          iconBgColor: const Color(0xFFFEE2E2),
-          iconColor: const Color(0xFFDC2626),
-        ),
+        if (recentInvoices.isEmpty)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'No invoices found',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          )
+        else
+          ...recentInvoices.map((inv) {
+            final isPaid = inv.status == InvoiceStatus.paid;
+            final isOver = inv.isOverdue || inv.status == InvoiceStatus.overdue;
+            final statusColor = isPaid
+                ? const Color(0xFF0D9488)
+                : isOver
+                    ? const Color(0xFFDC2626)
+                    : const Color(0xFFD97706);
+            final iconBgColor = isPaid
+                ? const Color(0xFFCCFBF1).withValues(alpha: 0.7)
+                : isOver
+                    ? const Color(0xFFFEE2E2)
+                    : const Color(0xFFFEF3C7);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _buildInvoiceItemRow(
+                context: context,
+                client: inv.clientName,
+                invCode: '${inv.invoiceNumber} • ${DateFormat.MMMd().format(inv.issueDate)}',
+                amount: '\$${inv.totalAmount.toStringAsFixed(2)}',
+                status: inv.status.label.toUpperCase(),
+                statusColor: statusColor,
+                iconBgColor: iconBgColor,
+                iconColor: statusColor,
+              ),
+            );
+          }),
       ],
     );
   }

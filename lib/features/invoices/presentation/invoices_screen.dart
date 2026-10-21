@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../app/router/route_names.dart';
 import '../../../app/theme/app_colors.dart';
+import '../data/invoice_repository.dart';
+import '../domain/models/invoice_model.dart';
 
 // ---------------------------------------------------------------------------
-// Model for Invoices Screen
+// Filter for Invoices Screen
 // ---------------------------------------------------------------------------
 
 enum InvoiceFilterStatus {
@@ -16,28 +19,6 @@ enum InvoiceFilterStatus {
   sent,
   overdue,
   paid,
-}
-
-class _InvoiceListItem {
-  final String id;
-  final String number;
-  final String clientName;
-  final String clientAvatar;
-  final InvoiceFilterStatus status;
-  final String statusDetail;
-  final double amount;
-  final String date;
-
-  const _InvoiceListItem({
-    required this.id,
-    required this.number,
-    required this.clientName,
-    required this.clientAvatar,
-    required this.status,
-    required this.statusDetail,
-    required this.amount,
-    required this.date,
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -59,85 +40,39 @@ class _InvoicesScreenState extends ConsumerState<InvoicesScreen> {
   String _searchQuery = '';
   String _sortBy = 'date'; // 'date', 'amount', 'name'
 
-  final List<_InvoiceListItem> _allInvoices = const [
-    _InvoiceListItem(
-      id: '1023',
-      number: '#1023',
-      clientName: 'Sarah Johnson',
-      clientAvatar: 'SJ',
-      status: InvoiceFilterStatus.overdue,
-      statusDetail: '3 days late',
-      amount: 450.00,
-      date: '2024-10-18',
-    ),
-    _InvoiceListItem(
-      id: '1019',
-      number: '#1019',
-      clientName: 'Daniel Kim',
-      clientAvatar: 'DK',
-      status: InvoiceFilterStatus.overdue,
-      statusDetail: '9 days late',
-      amount: 250.00,
-      date: '2024-10-12',
-    ),
-    _InvoiceListItem(
-      id: '1026',
-      number: '#1026',
-      clientName: 'Daniel Kim',
-      clientAvatar: 'DK',
-      status: InvoiceFilterStatus.sent,
-      statusDetail: 'Due in 6 days',
-      amount: 900.00,
-      date: '2024-10-20',
-    ),
-    _InvoiceListItem(
-      id: '1018',
-      number: '#1018',
-      clientName: 'Sarah Johnson',
-      clientAvatar: 'SJ',
-      status: InvoiceFilterStatus.paid,
-      statusDetail: 'Completed',
-      amount: 1500.00,
-      date: '2024-10-10',
-    ),
-    _InvoiceListItem(
-      id: '1028',
-      number: '#1028',
-      clientName: 'Alex Rivera',
-      clientAvatar: 'AR',
-      status: InvoiceFilterStatus.draft,
-      statusDetail: 'Saved as draft',
-      amount: 850.00,
-      date: '2024-10-21',
-    ),
-  ];
-
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
 
-  List<_InvoiceListItem> get _filteredInvoices {
-    return _allInvoices.where((inv) {
+  List<InvoiceModel> _filterInvoices(List<InvoiceModel> invoices) {
+    return invoices.where((inv) {
       // Status filter
-      if (_selectedFilter != InvoiceFilterStatus.all &&
-          inv.status != _selectedFilter) {
-        return false;
+      if (_selectedFilter != InvoiceFilterStatus.all) {
+        final matchesStatus = switch (_selectedFilter) {
+          InvoiceFilterStatus.all => true,
+          InvoiceFilterStatus.draft => inv.status == InvoiceStatus.draft,
+          InvoiceFilterStatus.sent => inv.status == InvoiceStatus.sent,
+          InvoiceFilterStatus.overdue =>
+            inv.isOverdue || inv.status == InvoiceStatus.overdue,
+          InvoiceFilterStatus.paid => inv.status == InvoiceStatus.paid,
+        };
+        if (!matchesStatus) return false;
       }
       // Search filter
       if (_searchQuery.trim().isNotEmpty) {
         final q = _searchQuery.toLowerCase();
         final matchesClient = inv.clientName.toLowerCase().contains(q);
-        final matchesNumber = inv.number.toLowerCase().contains(q);
+        final matchesNumber = inv.invoiceNumber.toLowerCase().contains(q);
         if (!matchesClient && !matchesNumber) return false;
       }
       return true;
     }).toList()
       ..sort((a, b) {
-        if (_sortBy == 'amount') return b.amount.compareTo(a.amount);
+        if (_sortBy == 'amount') return b.totalAmount.compareTo(a.totalAmount);
         if (_sortBy == 'name') return a.clientName.compareTo(b.clientName);
-        return b.date.compareTo(a.date);
+        return b.issueDate.compareTo(a.issueDate);
       });
   }
 
@@ -225,7 +160,9 @@ class _InvoicesScreenState extends ConsumerState<InvoicesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _filteredInvoices;
+    final invoicesAsync = ref.watch(invoicesStreamProvider);
+    final allInvoices = invoicesAsync.asData?.value ?? kSeedInvoices;
+    final filtered = _filterInvoices(allInvoices);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -239,7 +176,7 @@ class _InvoicesScreenState extends ConsumerState<InvoicesScreen> {
             const SizedBox(height: 16),
           ],
           // Plan Usage Banner Card
-          _buildPlanUsageBanner(),
+          _buildPlanUsageBanner(allInvoices.length),
           const SizedBox(height: 20),
           // Horizontal Filter Chips
           _buildFilterChipsRow(),
@@ -362,7 +299,10 @@ class _InvoicesScreenState extends ConsumerState<InvoicesScreen> {
 
   // ── Plan Usage Banner ──────────────────────────────────────────────────────
 
-  Widget _buildPlanUsageBanner() {
+  Widget _buildPlanUsageBanner(int count) {
+    final usedCount = count.clamp(0, 5);
+    final widthFactor = (count / 5.0).clamp(0.0, 1.0);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -427,9 +367,9 @@ class _InvoicesScreenState extends ConsumerState<InvoicesScreen> {
           ),
           const SizedBox(height: 6),
           // Title
-          const Text(
-            '3 of 5 free invoices used',
-            style: TextStyle(
+          Text(
+            '$usedCount of 5 free invoices used',
+            style: const TextStyle(
               fontFamily: 'Inter',
               fontSize: 18,
               fontWeight: FontWeight.w800,
@@ -438,7 +378,7 @@ class _InvoicesScreenState extends ConsumerState<InvoicesScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          // Progress bar (60% fill)
+          // Progress bar
           Container(
             height: 6,
             width: double.infinity,
@@ -448,7 +388,7 @@ class _InvoicesScreenState extends ConsumerState<InvoicesScreen> {
             ),
             child: FractionallySizedBox(
               alignment: Alignment.centerLeft,
-              widthFactor: 3 / 5,
+              widthFactor: widthFactor,
               child: Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -569,7 +509,19 @@ class _InvoicesScreenState extends ConsumerState<InvoicesScreen> {
 
   // ── Invoice Card ───────────────────────────────────────────────────────────
 
-  Widget _buildInvoiceCard(_InvoiceListItem inv) {
+  Widget _buildInvoiceCard(InvoiceModel inv) {
+    String statusDetail;
+    if (inv.status == InvoiceStatus.paid) {
+      final date = inv.paidAt ?? inv.updatedAt ?? DateTime.now();
+      statusDetail = 'Paid on ${DateFormat.MMMd().format(date)}';
+    } else if (inv.isOverdue || inv.status == InvoiceStatus.overdue) {
+      statusDetail = '${inv.daysOverdue} days overdue';
+    } else if (inv.status == InvoiceStatus.sent) {
+      statusDetail = 'Due in ${inv.dueDate.difference(DateTime.now()).inDays.clamp(0, 365)} days';
+    } else {
+      statusDetail = 'Due ${DateFormat.MMMd().format(inv.dueDate)}';
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -606,7 +558,7 @@ class _InvoicesScreenState extends ConsumerState<InvoicesScreen> {
                     Row(
                       children: [
                         Text(
-                          '${inv.number} ',
+                          '${inv.invoiceNumber} ',
                           style: const TextStyle(
                             fontFamily: 'Inter',
                             fontSize: 12,
@@ -631,14 +583,17 @@ class _InvoicesScreenState extends ConsumerState<InvoicesScreen> {
                     const SizedBox(height: 5),
                     Row(
                       children: [
-                        _buildStatusBadge(inv.status),
+                        _buildStatusBadge(inv.status, inv.isOverdue),
                         const SizedBox(width: 6),
-                        Text(
-                          inv.statusDetail,
-                          style: const TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 11,
-                            color: AppColors.textSecondary,
+                        Expanded(
+                          child: Text(
+                            statusDetail,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 11,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                         ),
                       ],
@@ -646,12 +601,13 @@ class _InvoicesScreenState extends ConsumerState<InvoicesScreen> {
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
               // Right: Amount + Chevron
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '\$${inv.amount.toStringAsFixed(2)}',
+                    '\$${inv.totalAmount.toStringAsFixed(2)}',
                     style: const TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 15,
@@ -674,60 +630,71 @@ class _InvoicesScreenState extends ConsumerState<InvoicesScreen> {
     );
   }
 
-  Widget _buildAvatar(_InvoiceListItem inv) {
-    Color bg = const Color(0xFFF3EBE1);
-    Color fg = const Color(0xFF7A5C3D);
+  Widget _buildAvatar(InvoiceModel inv) {
+    final initials = inv.clientName.trim().isNotEmpty
+        ? inv.clientName
+            .trim()
+            .split(RegExp(r'\s+'))
+            .map((s) => s.isNotEmpty ? s[0].toUpperCase() : '')
+            .take(2)
+            .join()
+        : 'IN';
 
-    if (inv.clientAvatar == 'DK') {
-      bg = const Color(0xFFDEEBF7);
-      fg = const Color(0xFF2C5E8A);
-    } else if (inv.clientAvatar == 'AR') {
-      bg = const Color(0xFFE8F4EC);
-      fg = const Color(0xFF2E6D43);
-    }
+    final colors = [
+      (const Color(0xFFDEEBF7), const Color(0xFF2C5E8A)),
+      (const Color(0xFFE8F4EC), const Color(0xFF2E6D43)),
+      (const Color(0xFFF3EBE1), const Color(0xFF7A5C3D)),
+      (const Color(0xFFFCE7F3), const Color(0xFF9D174D)),
+    ];
+    final colorPair = colors[inv.clientName.hashCode.abs() % colors.length];
 
     return Container(
       width: 44,
       height: 44,
       decoration: BoxDecoration(
-        color: bg,
+        color: colorPair.$1,
         shape: BoxShape.circle,
       ),
       child: Center(
         child: Text(
-          inv.clientAvatar,
+          initials,
           style: TextStyle(
             fontFamily: 'Inter',
             fontSize: 14,
             fontWeight: FontWeight.w700,
-            color: fg,
+            color: colorPair.$2,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildStatusBadge(InvoiceFilterStatus status) {
-    Color bg = const Color(0xFFFEE2E2);
-    Color fg = const Color(0xFFEF4444);
-    String label = 'OVERDUE';
-    IconData icon = Icons.access_time_rounded;
+  Widget _buildStatusBadge(InvoiceStatus status, bool isOverdue) {
+    Color bg = const Color(0xFFF1F5F9);
+    Color fg = const Color(0xFF64748B);
+    String label = 'DRAFT';
+    IconData icon = Icons.edit_note_rounded;
 
-    if (status == InvoiceFilterStatus.sent) {
-      bg = const Color(0xFFEFF6FF);
-      fg = const Color(0xFF3B82F6);
-      label = 'SENT';
+    if (status == InvoiceStatus.overdue || isOverdue) {
+      bg = const Color(0xFFFEE2E2);
+      fg = const Color(0xFFEF4444);
+      label = 'OVERDUE';
       icon = Icons.access_time_rounded;
-    } else if (status == InvoiceFilterStatus.paid) {
+    } else if (status == InvoiceStatus.paid) {
       bg = const Color(0xFFDCFCE7);
       fg = const Color(0xFF16A34A);
       label = 'PAID';
       icon = Icons.check_circle_outline_rounded;
-    } else if (status == InvoiceFilterStatus.draft) {
-      bg = const Color(0xFFF1F5F9);
-      fg = const Color(0xFF64748B);
-      label = 'DRAFT';
-      icon = Icons.edit_note_rounded;
+    } else if (status == InvoiceStatus.sent) {
+      bg = const Color(0xFFEFF6FF);
+      fg = const Color(0xFF3B82F6);
+      label = 'SENT';
+      icon = Icons.access_time_rounded;
+    } else if (status == InvoiceStatus.viewed) {
+      bg = const Color(0xFFFEF3C7);
+      fg = const Color(0xFFD97706);
+      label = 'VIEWED';
+      icon = Icons.visibility_outlined;
     }
 
     return Container(

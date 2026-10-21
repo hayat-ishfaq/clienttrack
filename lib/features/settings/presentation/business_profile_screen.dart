@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/router/route_names.dart';
 import '../../../app/theme/app_colors.dart';
+import '../data/business_profile_repository.dart';
+import '../domain/models/business_profile_model.dart';
 
 // ---------------------------------------------------------------------------
 // Screen: Business Profile
@@ -34,6 +36,7 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
   String _selectedPaymentTerms = 'Net 15';
 
   bool _isSaving = false;
+  bool _initialized = false;
   String? _uploadedLogoPath;
 
   final List<String> _currencies = const [
@@ -326,22 +329,81 @@ class _BusinessProfileScreenState extends ConsumerState<BusinessProfileScreen> {
     HapticFeedback.mediumImpact();
     setState(() => _isSaving = true);
 
-    await Future.delayed(const Duration(milliseconds: 600));
+    try {
+      final currentProfile = ref.read(businessProfileStreamProvider).asData?.value;
+      final currencyCode = _selectedCurrency.split(' - ').first;
+      final currencySymbol = currencyCode == 'USD'
+          ? '\$'
+          : currencyCode == 'EUR'
+              ? '€'
+              : currencyCode == 'GBP'
+                  ? '£'
+                  : '\$';
 
-    if (mounted) {
-      setState(() => _isSaving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Business profile updated successfully!'),
-          backgroundColor: AppColors.primaryForest,
-          duration: Duration(seconds: 2),
-        ),
+      final updatedProfile = (currentProfile ??
+              const BusinessProfileModel(
+                uid: '',
+                fullName: '',
+                businessName: '',
+                email: '',
+              ))
+          .copyWith(
+        fullName: _nameController.text.trim(),
+        businessName: _businessNameController.text.trim(),
+        email: _emailController.text.trim(),
+        phone: _phoneController.text.trim(),
+        currencyCode: currencyCode,
+        currencySymbol: currencySymbol,
+        paymentTerms: _selectedPaymentTerms,
+        logoUrl: _uploadedLogoPath,
       );
+
+      await ref.read(businessProfileRepositoryProvider).updateProfile(updatedProfile);
+
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Business profile updated successfully!'),
+            backgroundColor: AppColors.primaryForest,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update profile: $e'),
+            backgroundColor: AppColors.overdueRed,
+          ),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final profileAsync = ref.watch(businessProfileStreamProvider);
+    if (!_initialized && profileAsync.hasValue && profileAsync.value != null) {
+      final p = profileAsync.value!;
+      _nameController.text = p.fullName;
+      _businessNameController.text = p.businessName;
+      _emailController.text = p.email;
+      _phoneController.text = p.phone;
+      _uploadedLogoPath = p.logoUrl;
+      final matchCurrency = _currencies.firstWhere(
+        (c) => c.startsWith(p.currencyCode),
+        orElse: () => _selectedCurrency,
+      );
+      _selectedCurrency = matchCurrency;
+      if (_paymentTerms.contains(p.paymentTerms)) {
+        _selectedPaymentTerms = p.paymentTerms;
+      }
+      _initialized = true;
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: _buildAppBar(),

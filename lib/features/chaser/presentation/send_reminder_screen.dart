@@ -7,6 +7,10 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/router/route_names.dart';
 import '../../../app/theme/app_colors.dart';
+import '../../invoices/data/invoice_repository.dart';
+import '../../invoices/domain/models/invoice_model.dart';
+import '../data/reminder_repository.dart';
+import '../domain/models/reminder_log_model.dart';
 
 // ---------------------------------------------------------------------------
 // Screen: Send Reminder
@@ -36,30 +40,27 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
   late TextEditingController _messageController;
   bool _isEditing = false;
   bool _isPolishing = false;
+  bool _initialized = false;
 
-  // Invoice details (mapped from Firestore / demo dataset)
-  final String _clientName = 'Sarah Johnson';
-  final String _clientInitials = 'SJ';
-  final String _invoiceNumber = '#1023';
-  final String _amount = '\$450.00';
-  final String _statusBadge = '3 days overdue';
-  final String _clientPhone = '+1 (555) 234-5678';
-  final String _clientEmail = 'sarah@brightside.cafe';
+  Map<ReminderTone, String> _buildTemplates(InvoiceModel inv) {
+    final balance = '\$${inv.balanceDue.toStringAsFixed(2)}';
+    final number = inv.invoiceNumber;
+    final name = inv.clientName.split(' ').first;
 
-  final Map<ReminderTone, String> _templates = {
-    ReminderTone.friendly:
-        'Hi Sarah, just a quick reminder that invoice #1023 for \$450 is currently due. Please let me know if you need anything from my side. Thanks!',
-    ReminderTone.professional:
-        'Dear Sarah,\n\nThis is a courteous follow-up regarding invoice #1023 for \$450.00, which is currently past due. Please confirm payment at your earliest convenience.\n\nBest regards,\nBrightside Cafe',
-    ReminderTone.finalNotice:
-        'URGENT: Invoice #1023 for \$450.00 is now overdue by 3 days. Please settle this outstanding balance immediately to avoid any service disruptions.\n\nThank you for your prompt attention.',
-  };
+    return {
+      ReminderTone.friendly:
+          'Hi $name, just a quick reminder that invoice $number for $balance is currently due. Please let me know if you need anything from my side. Thanks!',
+      ReminderTone.professional:
+          'Dear ${inv.clientName},\n\nThis is a courteous follow-up regarding invoice $number for $balance, which is currently past due. Please confirm payment at your earliest convenience.\n\nBest regards,\n${inv.projectTitle ?? 'ClientTrack'}',
+      ReminderTone.finalNotice:
+          'URGENT: Invoice $number for $balance is now overdue by ${inv.daysOverdue} days. Please settle this outstanding balance immediately to avoid any service disruptions.\n\nThank you for your prompt attention.',
+    };
+  }
 
   @override
   void initState() {
     super.initState();
-    _messageController =
-        TextEditingController(text: _templates[ReminderTone.friendly]);
+    _messageController = TextEditingController();
   }
 
   @override
@@ -68,33 +69,38 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
     super.dispose();
   }
 
-  void _onToneSelected(ReminderTone tone) {
+  void _onToneSelected(ReminderTone tone, InvoiceModel invoice) {
     HapticFeedback.selectionClick();
+    final templates = _buildTemplates(invoice);
     setState(() {
       _selectedTone = tone;
-      _messageController.text = _templates[tone]!;
+      _messageController.text = templates[tone]!;
       _isEditing = false;
     });
   }
 
-  Future<void> _handleAiPolish() async {
+  Future<void> _handleAiPolish(InvoiceModel invoice) async {
     HapticFeedback.mediumImpact();
     setState(() => _isPolishing = true);
 
     await Future.delayed(const Duration(milliseconds: 700));
 
     if (mounted) {
+      final name = invoice.clientName.split(' ').first;
+      final number = invoice.invoiceNumber;
+      final balance = '\$${invoice.balanceDue.toStringAsFixed(2)}';
+
       setState(() {
         _isPolishing = false;
         if (_selectedTone == ReminderTone.friendly) {
           _messageController.text =
-              'Hi Sarah! Hope your week is going great. Just a gentle heads-up that invoice #1023 (\$450) is ready for settlement whenever you have a moment. Thanks so much!';
+              'Hi $name! Hope your week is going great. Just a gentle heads-up that invoice $number ($balance) is ready for settlement whenever you have a moment. Thanks so much!';
         } else if (_selectedTone == ReminderTone.professional) {
           _messageController.text =
-              'Dear Sarah,\n\nI hope this email finds you well. We would appreciate it if you could verify the payment status of invoice #1023 (\$450.00), due recently. Please let us know if you require any additional invoice details.\n\nWarm regards,\nClientTrack Finance';
+              'Dear ${invoice.clientName},\n\nI hope this message finds you well. We would appreciate it if you could verify the payment status of invoice $number ($balance). Please let us know if you require any additional details.\n\nWarm regards,\nFinance';
         } else {
           _messageController.text =
-              'Important Notice: Invoice #1023 for \$450.00 requires immediate settlement. Kindly process the pending balance today to maintain continuous service.\n\nThank you for prioritizing this.';
+              'Important Notice: Invoice $number for $balance requires immediate settlement. Kindly process the pending balance today to maintain continuous service.\n\nThank you for prioritizing this.';
         }
       });
 
@@ -120,49 +126,73 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
     );
   }
 
-  Future<void> _shareNative() async {
+  Future<void> _logReminderSent(InvoiceModel invoice, String channel) async {
+    try {
+      final log = ReminderLogModel(
+        id: '',
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        clientId: invoice.clientId,
+        clientName: invoice.clientName,
+        channel: channel,
+        tone: _selectedTone.name,
+        messageContent: _messageController.text,
+        sentAt: DateTime.now(),
+        recipient: (channel == 'whatsapp' || channel == 'sms')
+            ? invoice.clientPhone
+            : invoice.clientEmail,
+      );
+      await ref.read(reminderRepositoryProvider).logReminder(log);
+    } catch (_) {}
+  }
+
+  Future<void> _shareNative(InvoiceModel invoice) async {
     HapticFeedback.lightImpact();
+    await _logReminderSent(invoice, 'native');
     await SharePlus.instance.share(
       ShareParams(
         text: _messageController.text,
-        subject: 'Payment Reminder for Invoice $_invoiceNumber',
+        subject: 'Payment Reminder for Invoice ${invoice.invoiceNumber}',
       ),
     );
   }
 
-  Future<void> _shareViaWhatsApp() async {
+  Future<void> _shareViaWhatsApp(InvoiceModel invoice) async {
     HapticFeedback.lightImpact();
-    final cleanPhone = _clientPhone.replaceAll(RegExp(r'[^0-9]'), '');
+    await _logReminderSent(invoice, 'whatsapp');
+    final cleanPhone = invoice.clientPhone.replaceAll(RegExp(r'[^0-9]'), '');
     final encodedText = Uri.encodeComponent(_messageController.text);
     final url = Uri.parse('https://wa.me/$cleanPhone?text=$encodedText');
 
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     } else {
-      _shareNative();
+      _shareNative(invoice);
     }
   }
 
-  Future<void> _shareViaSms() async {
+  Future<void> _shareViaSms(InvoiceModel invoice) async {
     HapticFeedback.lightImpact();
-    final cleanPhone = _clientPhone.replaceAll(RegExp(r'[^0-9]'), '');
+    await _logReminderSent(invoice, 'sms');
+    final cleanPhone = invoice.clientPhone.replaceAll(RegExp(r'[^0-9]'), '');
     final encodedText = Uri.encodeComponent(_messageController.text);
     final url = Uri.parse('sms:$cleanPhone?body=$encodedText');
 
     if (await canLaunchUrl(url)) {
       await launchUrl(url);
     } else {
-      _shareNative();
+      _shareNative(invoice);
     }
   }
 
-  Future<void> _shareViaMail() async {
+  Future<void> _shareViaMail(InvoiceModel invoice) async {
     HapticFeedback.lightImpact();
+    await _logReminderSent(invoice, 'email');
     final url = Uri(
       scheme: 'mailto',
-      path: _clientEmail,
+      path: invoice.clientEmail,
       queryParameters: {
-        'subject': 'Payment Reminder: Invoice $_invoiceNumber',
+        'subject': 'Payment Reminder: Invoice ${invoice.invoiceNumber}',
         'body': _messageController.text,
       },
     );
@@ -170,12 +200,25 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
     if (await canLaunchUrl(url)) {
       await launchUrl(url);
     } else {
-      _shareNative();
+      _shareNative(invoice);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final invoiceAsync = ref.watch(invoiceByIdProvider(widget.invoiceId));
+    final invoice = invoiceAsync.asData?.value ??
+        kSeedInvoices.firstWhere(
+          (i) => i.id == widget.invoiceId,
+          orElse: () => kSeedInvoices.first,
+        );
+
+    if (!_initialized) {
+      _messageController.text =
+          _buildTemplates(invoice)[ReminderTone.friendly]!;
+      _initialized = true;
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: _buildAppBar(),
@@ -189,13 +232,13 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Invoice Summary Card
-                  _buildInvoiceSummaryCard(),
+                  _buildInvoiceSummaryCard(invoice),
                   const SizedBox(height: 24),
                   // Reminder Tone Segmented Control
-                  _buildReminderToneSection(),
+                  _buildReminderToneSection(invoice),
                   const SizedBox(height: 24),
                   // Message Box Section
-                  _buildMessageBoxSection(),
+                  _buildMessageBoxSection(invoice),
                   const SizedBox(height: 14),
                   // Free share counter & upgrade link
                   _buildUpgradeFooterNote(),
@@ -205,7 +248,7 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
             ),
           ),
           // Bottom Action & Share Via Area
-          _buildBottomActionArea(),
+          _buildBottomActionArea(invoice),
         ],
       ),
     );
@@ -241,7 +284,20 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
 
   // ── Invoice Summary Card ───────────────────────────────────────────────────
 
-  Widget _buildInvoiceSummaryCard() {
+  Widget _buildInvoiceSummaryCard(InvoiceModel invoice) {
+    final initials = invoice.clientName.trim().isNotEmpty
+        ? invoice.clientName
+            .trim()
+            .split(' ')
+            .map((s) => s.isNotEmpty ? s[0].toUpperCase() : '')
+            .take(2)
+            .join()
+        : 'C';
+
+    final statusBadge = invoice.isOverdue
+        ? '${invoice.daysOverdue} days overdue'
+        : invoice.status.label;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -263,7 +319,7 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
             radius: 22,
             backgroundColor: const Color(0xFF1E293B),
             child: Text(
-              _clientInitials,
+              initials,
               style: const TextStyle(
                 fontFamily: 'Inter',
                 fontSize: 14,
@@ -279,7 +335,7 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _clientName,
+                  invoice.clientName,
                   style: const TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 16,
@@ -289,7 +345,7 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Invoice $_invoiceNumber',
+                  'Invoice ${invoice.invoiceNumber}',
                   style: const TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 13,
@@ -304,7 +360,7 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                _amount,
+                '\$${invoice.balanceDue.toStringAsFixed(2)}',
                 style: const TextStyle(
                   fontFamily: 'Inter',
                   fontSize: 17,
@@ -316,11 +372,13 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFDC2626), // Coral red badge
+                  color: invoice.isOverdue
+                      ? const Color(0xFFDC2626)
+                      : AppColors.sentBlue,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  _statusBadge,
+                  statusBadge,
                   style: const TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 10,
@@ -338,7 +396,7 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
 
   // ── Reminder Tone Section ──────────────────────────────────────────────────
 
-  Widget _buildReminderToneSection() {
+  Widget _buildReminderToneSection(InvoiceModel invoice) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -361,9 +419,9 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
           ),
           child: Row(
             children: [
-              _buildTonePill('Friendly', ReminderTone.friendly),
-              _buildTonePill('Professional', ReminderTone.professional),
-              _buildTonePill('Final', ReminderTone.finalNotice),
+              _buildTonePill('Friendly', ReminderTone.friendly, invoice),
+              _buildTonePill('Professional', ReminderTone.professional, invoice),
+              _buildTonePill('Final', ReminderTone.finalNotice, invoice),
             ],
           ),
         ),
@@ -371,12 +429,12 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
     );
   }
 
-  Widget _buildTonePill(String label, ReminderTone tone) {
+  Widget _buildTonePill(String label, ReminderTone tone, InvoiceModel invoice) {
     final isSelected = _selectedTone == tone;
 
     return Expanded(
       child: InkWell(
-        onTap: () => _onToneSelected(tone),
+        onTap: () => _onToneSelected(tone, invoice),
         borderRadius: BorderRadius.circular(10),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
@@ -411,7 +469,7 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
 
   // ── Message Box Section ────────────────────────────────────────────────────
 
-  Widget _buildMessageBoxSection() {
+  Widget _buildMessageBoxSection(InvoiceModel invoice) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -430,7 +488,7 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
             ),
             // AI POLISH PRO Badge Button
             InkWell(
-              onTap: _isPolishing ? null : _handleAiPolish,
+              onTap: _isPolishing ? null : () => _handleAiPolish(invoice),
               borderRadius: BorderRadius.circular(12),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
@@ -580,7 +638,7 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
 
   // ── Bottom Action & Share Via Area ─────────────────────────────────────────
 
-  Widget _buildBottomActionArea() {
+  Widget _buildBottomActionArea(InvoiceModel invoice) {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
       decoration: BoxDecoration(
@@ -646,7 +704,7 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
                   child: SizedBox(
                     height: 48,
                     child: ElevatedButton(
-                      onPressed: _shareNative,
+                      onPressed: () => _shareNative(invoice),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryForest,
                         foregroundColor: Colors.white,
@@ -712,26 +770,26 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
                   icon: Icons.chat_bubble_outline_rounded,
                   label: 'WhatsApp',
                   bgColor: const Color(0xFF25D366),
-                  onTap: _shareViaWhatsApp,
+                  onTap: () => _shareViaWhatsApp(invoice),
                 ),
                 _buildAppShareIcon(
                   icon: Icons.chat_rounded,
                   label: 'Messages',
                   bgColor: const Color(0xFF3B82F6),
-                  onTap: _shareViaSms,
+                  onTap: () => _shareViaSms(invoice),
                 ),
                 _buildAppShareIcon(
                   icon: Icons.mail_rounded,
                   label: 'Mail',
                   bgColor: const Color(0xFF1E293B),
-                  onTap: _shareViaMail,
+                  onTap: () => _shareViaMail(invoice),
                 ),
                 _buildAppShareIcon(
                   icon: Icons.more_horiz_rounded,
                   label: 'More',
                   bgColor: const Color(0xFFF1F5F9),
                   iconColor: const Color(0xFF64748B),
-                  onTap: _shareNative,
+                  onTap: () => _shareNative(invoice),
                 ),
               ],
             ),

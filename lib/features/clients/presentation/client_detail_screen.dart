@@ -2,49 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/router/route_names.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../shared/widgets/chips/pro_badge.dart';
-
-// ---------------------------------------------------------------------------
-// Demo data stub — replaced by Firestore (FT-007)
-// ---------------------------------------------------------------------------
-
-enum _ProjectStatus { inProgress, completed, onHold }
-
-class _DemoProject {
-  final String id;
-  final String title;
-  final String updatedLabel;
-  final _ProjectStatus status;
-  const _DemoProject({
-    required this.id,
-    required this.title,
-    required this.updatedLabel,
-    required this.status,
-  });
-}
-
-class _DemoInvoice {
-  final String id;
-  final String number;
-  final String amount;
-  final String date;
-  final String statusLabel;
-  final Color statusBg;
-  final Color statusFg;
-  const _DemoInvoice({
-    required this.id,
-    required this.number,
-    required this.amount,
-    required this.date,
-    required this.statusLabel,
-    required this.statusBg,
-    required this.statusFg,
-  });
-}
+import '../domain/models/client_model.dart';
+import '../data/client_repository.dart';
+import '../../projects/domain/models/project_model.dart';
+import '../../projects/data/project_repository.dart';
+import '../../invoices/domain/models/invoice_model.dart';
+import '../../invoices/data/invoice_repository.dart';
 
 // ---------------------------------------------------------------------------
 // Screen 10: Client Detail
@@ -63,57 +32,6 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  // ── Demo state (replaced by real Firestore streams in FT-007) ──────────────
-  final String _name = 'Sarah Johnson';
-  final String _company = 'Brightside Cafe';
-  final String _email = 'sarah@brightsidecafe.com';
-  final String _phone = '+1 (555) 234-5678';
-  final String _whatsapp = '+15552345678';
-
-  final double _billed = 1950;
-  final double _paid = 1500;
-  final double _outstanding = 450;
-
-  final int _avgDaysLate = 4;
-  final int _onTimePercent = 67;
-  final int _invoiceCount = 6;
-
-  final List<_DemoProject> _projects = const [
-    _DemoProject(
-      id: 'p1',
-      title: 'Website Redesign',
-      updatedLabel: 'Updated 2h ago',
-      status: _ProjectStatus.inProgress,
-    ),
-    _DemoProject(
-      id: 'p2',
-      title: 'Landing Page Copy',
-      updatedLabel: 'Closed Sep 12',
-      status: _ProjectStatus.completed,
-    ),
-  ];
-
-  final List<_DemoInvoice> _invoices = const [
-    _DemoInvoice(
-      id: 'inv1',
-      number: 'INV-0042',
-      amount: '\$950',
-      date: 'Oct 1, 2026',
-      statusLabel: 'Overdue',
-      statusBg: AppColors.overdueRedBg,
-      statusFg: AppColors.overdueRed,
-    ),
-    _DemoInvoice(
-      id: 'inv2',
-      number: 'INV-0038',
-      amount: '\$1,000',
-      date: 'Sep 5, 2026',
-      statusLabel: 'Paid',
-      statusBg: AppColors.paidTealBg,
-      statusFg: AppColors.paidTeal,
-    ),
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -129,23 +47,26 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
 
   // ── Quick actions ──────────────────────────────────────────────────────────
 
-  Future<void> _launchEmail() async {
-    final uri = Uri(scheme: 'mailto', path: _email);
+  Future<void> _launchEmail(String email) async {
+    if (email.isEmpty) return;
+    final uri = Uri(scheme: 'mailto', path: email);
     if (await canLaunchUrl(uri)) launchUrl(uri);
   }
 
-  Future<void> _launchCall() async {
-    final uri = Uri(scheme: 'tel', path: _phone);
+  Future<void> _launchCall(String phone) async {
+    if (phone.isEmpty) return;
+    final uri = Uri(scheme: 'tel', path: phone);
     if (await canLaunchUrl(uri)) launchUrl(uri);
   }
 
-  Future<void> _launchWhatsApp() async {
-    final uri = Uri.parse(
-        'https://wa.me/${_whatsapp.replaceAll(RegExp(r'[^0-9]'), '')}');
+  Future<void> _launchWhatsApp(String phone) async {
+    if (phone.isEmpty) return;
+    final cleanPhone = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    final uri = Uri.parse('https://wa.me/$cleanPhone');
     if (await canLaunchUrl(uri)) launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
-  void _showMoreMenu() {
+  void _showMoreMenu(ClientModel? client) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -158,7 +79,6 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Handle
               Container(
                 width: 40,
                 height: 4,
@@ -205,7 +125,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                         color: AppColors.overdueRed)),
                 onTap: () {
                   Navigator.pop(ctx);
-                  _confirmDelete();
+                  _confirmDelete(client);
                 },
               ),
             ],
@@ -215,7 +135,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
     );
   }
 
-  void _confirmDelete() {
+  void _confirmDelete(ClientModel? client) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -227,7 +147,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                 fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary)),
         content: Text(
-          'Deleting "$_name" will permanently remove all linked projects '
+          'Deleting "${client?.name ?? 'this client'}" will permanently remove all linked projects '
           'and invoices. This cannot be undone.',
           style: const TextStyle(
               fontFamily: 'Inter',
@@ -241,9 +161,10 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                 style: TextStyle(color: AppColors.textSecondary)),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              context.pop();
+              await ref.read(clientRepositoryProvider).deleteClient(widget.clientId);
+              if (mounted) context.pop();
             },
             child: const Text('Delete',
                 style: TextStyle(
@@ -260,9 +181,25 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
 
   @override
   Widget build(BuildContext context) {
+    final clientAsync = ref.watch(clientByIdProvider(widget.clientId));
+    final client = clientAsync.asData?.value;
+    final projects = ref.watch(clientProjectsStreamProvider(widget.clientId)).asData?.value ?? [];
+    final invoices = ref.watch(clientInvoicesStreamProvider(widget.clientId)).asData?.value ?? [];
+
+    final name = client?.name ?? 'Client';
+    final company = client?.company ?? '';
+    final email = client?.email ?? '';
+    final phone = client?.phone ?? '';
+    final initials = client?.initials ?? 'CL';
+    final presenceDot = client?.presenceDot ?? const Color(0xFF22C55E);
+
+    final billed = invoices.fold<double>(0.0, (s, i) => s + i.totalAmount);
+    final paid = invoices.fold<double>(0.0, (s, i) => s + i.amountPaid);
+    final outstanding = (billed - paid).clamp(0.0, double.infinity);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
-      appBar: _buildAppBar(),
+      appBar: _buildAppBar(client),
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -271,10 +208,10 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ── Profile header ─────────────────────────────────────────
-              _buildProfileHeader(),
+              _buildProfileHeader(name, company, initials, presenceDot),
 
               // ── Quick actions ──────────────────────────────────────────
-              _buildQuickActions(),
+              _buildQuickActions(email, phone),
               const SizedBox(height: 20),
 
               // ── Divider ────────────────────────────────────────────────
@@ -282,13 +219,13 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
               const SizedBox(height: 20),
 
               // ── Financial summary ──────────────────────────────────────
-              _buildFinancialSummary(),
+              _buildFinancialSummary(billed, paid, outstanding),
               const SizedBox(height: 20),
 
               // ── Payment history card ───────────────────────────────────
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _buildPaymentHistoryCard(),
+                child: _buildPaymentHistoryCard(invoices),
               ),
               const SizedBox(height: 20),
 
@@ -297,13 +234,13 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
               const SizedBox(height: 20),
 
               // ── Projects / Invoices tabs ───────────────────────────────
-              _buildTabBar(),
+              _buildTabBar(projects.length, invoices.length),
               const SizedBox(height: 12),
 
               // ── Tab content ────────────────────────────────────────────
               _tabController.index == 0
-                  ? _buildProjectsList()
-                  : _buildInvoicesList(),
+                  ? _buildProjectsList(projects)
+                  : _buildInvoicesList(invoices),
             ],
           ),
         ),
@@ -313,7 +250,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
 
   // ── AppBar ─────────────────────────────────────────────────────────────────
 
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(ClientModel? client) {
     return AppBar(
       backgroundColor: Colors.white,
       elevation: 0,
@@ -337,7 +274,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
         IconButton(
           icon: const Icon(Icons.more_vert_rounded,
               size: 22, color: AppColors.textPrimary),
-          onPressed: _showMoreMenu,
+          onPressed: () => _showMoreMenu(client),
         ),
       ],
       bottom: const PreferredSize(
@@ -349,7 +286,8 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
 
   // ── Profile header ─────────────────────────────────────────────────────────
 
-  Widget _buildProfileHeader() {
+  Widget _buildProfileHeader(
+      String name, String company, String initials, Color presenceDot) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 24),
       child: Column(
@@ -372,10 +310,10 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                     ),
                   ],
                 ),
-                child: const Center(
+                child: Center(
                   child: Text(
-                    'SJ',
-                    style: TextStyle(
+                    initials,
+                    style: const TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 28,
                       fontWeight: FontWeight.w700,
@@ -392,7 +330,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                   width: 16,
                   height: 16,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF22C55E),
+                    color: presenceDot,
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white, width: 2.5),
                   ),
@@ -403,7 +341,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
           const SizedBox(height: 12),
           // Name
           Text(
-            _name,
+            name,
             style: const TextStyle(
               fontFamily: 'Inter',
               fontSize: 22,
@@ -414,15 +352,16 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
           ),
           const SizedBox(height: 4),
           // Company
-          Text(
-            _company,
-            style: const TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
-              color: AppColors.textSecondary,
+          if (company.isNotEmpty)
+            Text(
+              company,
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                color: AppColors.textSecondary,
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -430,26 +369,26 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
 
   // ── Quick action row ────────────────────────────────────────────────────────
 
-  Widget _buildQuickActions() {
+  Widget _buildQuickActions(String email, String phone) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _QuickActionButton(
           icon: Icons.mail_outline_rounded,
           label: 'EMAIL',
-          onTap: _launchEmail,
+          onTap: () => _launchEmail(email),
         ),
         const SizedBox(width: 24),
         _QuickActionButton(
           icon: Icons.phone_outlined,
           label: 'CALL',
-          onTap: _launchCall,
+          onTap: () => _launchCall(phone),
         ),
         const SizedBox(width: 24),
         _QuickActionButton(
           icon: Icons.chat_bubble_outline_rounded,
           label: 'WHATSAPP',
-          onTap: _launchWhatsApp,
+          onTap: () => _launchWhatsApp(phone),
         ),
       ],
     );
@@ -457,26 +396,26 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
 
   // ── Financial summary ───────────────────────────────────────────────────────
 
-  Widget _buildFinancialSummary() {
+  Widget _buildFinancialSummary(double billed, double paid, double outstanding) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
           _FinancialMetric(
             label: 'BILLED',
-            value: '\$${_billed.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}',
+            value: '\$${billed.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}',
             valueColor: AppColors.textPrimary,
           ),
           _buildMetricDivider(),
           _FinancialMetric(
             label: 'PAID',
-            value: '\$${_paid.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}',
+            value: '\$${paid.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}',
             valueColor: AppColors.textPrimary,
           ),
           _buildMetricDivider(),
           _FinancialMetric(
             label: 'OUTSTANDING',
-            value: '\$${_outstanding.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}',
+            value: '\$${outstanding.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}',
             valueColor: AppColors.overdueRed,
           ),
         ],
@@ -495,7 +434,41 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
 
   // ── Payment history card ────────────────────────────────────────────────────
 
-  Widget _buildPaymentHistoryCard() {
+  Widget _buildPaymentHistoryCard(List<InvoiceModel> invoices) {
+    final hasInvoices = invoices.isNotEmpty;
+    final overdueCount = invoices.where((i) => i.isOverdue).length;
+    final onTimeCount = invoices.length - overdueCount;
+    final onTimePercent =
+        hasInvoices ? ((onTimeCount / invoices.length) * 100).round() : 100;
+
+    final totalOverdueDays = invoices
+        .where((i) => i.isOverdue)
+        .fold<int>(0, (s, i) => s + i.daysOverdue);
+    final avgDaysLate =
+        overdueCount > 0 ? (totalOverdueDays / overdueCount).round() : 0;
+
+    final chipLabel = !hasInvoices
+        ? 'No history'
+        : (onTimePercent >= 90
+            ? 'Usually pays on time'
+            : (onTimePercent >= 60 ? 'Sometimes late' : 'High risk'));
+
+    final chipBg = !hasInvoices
+        ? AppColors.draftGreyBg
+        : (onTimePercent >= 90
+            ? AppColors.paidTealBg
+            : (onTimePercent >= 60
+                ? AppColors.dueSoonAmberBg
+                : AppColors.overdueRedBg));
+
+    final chipFg = !hasInvoices
+        ? AppColors.draftGrey
+        : (onTimePercent >= 90
+            ? AppColors.paidTeal
+            : (onTimePercent >= 60
+                ? AppColors.dueSoonAmber
+                : AppColors.overdueRed));
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -533,16 +506,16 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.dueSoonAmberBg,
+                  color: chipBg,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Text(
-                  'Sometimes late',
+                child: Text(
+                  chipLabel,
                   style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 11.5,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.dueSoonAmber,
+                    color: chipFg,
                   ),
                 ),
               ),
@@ -568,7 +541,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '$_avgDaysLate',
+                      '$avgDaysLate',
                       style: const TextStyle(
                         fontFamily: 'Inter',
                         fontSize: 32,
@@ -595,7 +568,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '$_onTimePercent%',
+                      '$onTimePercent%',
                       style: const TextStyle(
                         fontFamily: 'Inter',
                         fontSize: 32,
@@ -618,7 +591,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Based on $_invoiceCount invoices',
+                'Based on ${invoices.length} invoices',
                 style: const TextStyle(
                   fontFamily: 'Inter',
                   fontSize: 12,
@@ -724,7 +697,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
 
   // ── Tab bar ─────────────────────────────────────────────────────────────────
 
-  Widget _buildTabBar() {
+  Widget _buildTabBar(int projectCount, int invoiceCount) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Container(
@@ -768,7 +741,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                 children: [
                   const Text('Projects'),
                   const SizedBox(width: 6),
-                  _CountBadge(count: _projects.length),
+                  _CountBadge(count: projectCount),
                 ],
               ),
             ),
@@ -778,7 +751,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                 children: [
                   const Text('Invoices'),
                   const SizedBox(width: 6),
-                  _CountBadge(count: _invoices.length),
+                  _CountBadge(count: invoiceCount),
                 ],
               ),
             ),
@@ -790,8 +763,8 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
 
   // ── Projects list ───────────────────────────────────────────────────────────
 
-  Widget _buildProjectsList() {
-    if (_projects.isEmpty) {
+  Widget _buildProjectsList(List<ProjectModel> projects) {
+    if (projects.isEmpty) {
       return _buildEmptyTabState(
         icon: Icons.work_outline_rounded,
         message: 'No projects yet',
@@ -802,7 +775,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
-        children: _projects
+        children: projects
             .map((p) => Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: _ProjectRow(
@@ -817,8 +790,8 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
 
   // ── Invoices list ────────────────────────────────────────────────────────────
 
-  Widget _buildInvoicesList() {
-    if (_invoices.isEmpty) {
+  Widget _buildInvoicesList(List<InvoiceModel> invoices) {
+    if (invoices.isEmpty) {
       return _buildEmptyTabState(
         icon: Icons.description_outlined,
         message: 'No invoices yet',
@@ -829,7 +802,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
-        children: _invoices
+        children: invoices
             .map((inv) => Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: _InvoiceRow(
@@ -1022,7 +995,7 @@ class _CountBadge extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _ProjectRow extends StatelessWidget {
-  final _DemoProject project;
+  final ProjectModel project;
   final VoidCallback onTap;
 
   const _ProjectRow({required this.project, required this.onTap});
@@ -1031,26 +1004,29 @@ class _ProjectRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color statusBg;
     final Color statusFg;
-    final String statusLabel;
+    final String statusLabel = project.status.label;
     final IconData statusIcon;
 
     switch (project.status) {
-      case _ProjectStatus.inProgress:
+      case ProjectStatus.inProgress:
         statusBg = AppColors.sentBlueBg;
         statusFg = AppColors.sentBlue;
-        statusLabel = 'In Progress';
         statusIcon = Icons.access_time_rounded;
-      case _ProjectStatus.completed:
+      case ProjectStatus.completed:
         statusBg = AppColors.paidTealBg;
         statusFg = AppColors.paidTeal;
-        statusLabel = 'Completed';
         statusIcon = Icons.check_circle_outline_rounded;
-      case _ProjectStatus.onHold:
+      case ProjectStatus.onHold:
+      case ProjectStatus.planning:
+      case ProjectStatus.notStarted:
         statusBg = AppColors.dueSoonAmberBg;
         statusFg = AppColors.dueSoonAmber;
-        statusLabel = 'On Hold';
         statusIcon = Icons.pause_circle_outline_rounded;
     }
+
+    final deadlineText = project.deadline != null
+        ? 'Due ${DateFormat('MMM d').format(project.deadline!)}'
+        : 'Ongoing';
 
     return Material(
       color: Colors.white,
@@ -1093,7 +1069,7 @@ class _ProjectRow extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      project.updatedLabel,
+                      deadlineText,
                       style: const TextStyle(
                         fontFamily: 'Inter',
                         fontSize: 12,
@@ -1122,7 +1098,7 @@ class _ProjectRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 4),
-              Icon(Icons.chevron_right_rounded,
+              const Icon(Icons.chevron_right_rounded,
                   size: 18, color: AppColors.textSecondary),
             ],
           ),
@@ -1137,13 +1113,34 @@ class _ProjectRow extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _InvoiceRow extends StatelessWidget {
-  final _DemoInvoice invoice;
+  final InvoiceModel invoice;
   final VoidCallback onTap;
 
   const _InvoiceRow({required this.invoice, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
+    final Color statusBg;
+    final Color statusFg;
+
+    switch (invoice.status) {
+      case InvoiceStatus.paid:
+        statusBg = AppColors.paidTealBg;
+        statusFg = AppColors.paidTeal;
+      case InvoiceStatus.overdue:
+        statusBg = AppColors.overdueRedBg;
+        statusFg = AppColors.overdueRed;
+      case InvoiceStatus.sent:
+      case InvoiceStatus.viewed:
+        statusBg = AppColors.sentBlueBg;
+        statusFg = AppColors.sentBlue;
+      case InvoiceStatus.draft:
+        statusBg = AppColors.draftGreyBg;
+        statusFg = AppColors.draftGrey;
+    }
+
+    final dateFormatted = DateFormat('MMM d, yyyy').format(invoice.issueDate);
+
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(14),
@@ -1163,11 +1160,11 @@ class _InvoiceRow extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: invoice.statusBg,
+                  color: statusBg,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(Icons.receipt_outlined,
-                    size: 18, color: invoice.statusFg),
+                    size: 18, color: statusFg),
               ),
               const SizedBox(width: 12),
               // Number + date
@@ -1176,7 +1173,7 @@ class _InvoiceRow extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      invoice.number,
+                      invoice.invoiceNumber,
                       style: const TextStyle(
                         fontFamily: 'Inter',
                         fontSize: 14,
@@ -1186,7 +1183,7 @@ class _InvoiceRow extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      invoice.date,
+                      dateFormatted,
                       style: const TextStyle(
                         fontFamily: 'Inter',
                         fontSize: 12,
@@ -1198,7 +1195,7 @@ class _InvoiceRow extends StatelessWidget {
               ),
               // Amount
               Text(
-                invoice.amount,
+                '\$${invoice.totalAmount.toStringAsFixed(0)}',
                 style: const TextStyle(
                   fontFamily: 'Inter',
                   fontSize: 14,
@@ -1212,21 +1209,21 @@ class _InvoiceRow extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: invoice.statusBg,
+                  color: statusBg,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  invoice.statusLabel,
+                  invoice.status.label,
                   style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: invoice.statusFg,
+                    color: statusFg,
                   ),
                 ),
               ),
               const SizedBox(width: 4),
-              Icon(Icons.chevron_right_rounded,
+              const Icon(Icons.chevron_right_rounded,
                   size: 18, color: AppColors.textSecondary),
             ],
           ),

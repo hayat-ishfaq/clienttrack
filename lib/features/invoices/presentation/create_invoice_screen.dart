@@ -6,37 +6,11 @@ import 'package:intl/intl.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../shared/widgets/buttons/primary_button.dart';
-
-// ---------------------------------------------------------------------------
-// Data models — replaced by real Firestore models in FT-009
-// ---------------------------------------------------------------------------
-
-class _LineItem {
-  String description;
-  String category;
-  double amount;
-
-  _LineItem({
-    required this.description,
-    required this.category,
-    required this.amount,
-  });
-}
-
-class _DemoClient {
-  final String id;
-  final String name;
-  final String email;
-  const _DemoClient(
-      {required this.id, required this.name, required this.email});
-}
-
-const _kDemoClients = <_DemoClient>[
-  _DemoClient(id: 'c1', name: 'Sarah Jenkins', email: 's.jenkins@studio.co'),
-  _DemoClient(id: 'c2', name: 'Alex Rivera', email: 'alex@studioarc.com'),
-  _DemoClient(id: 'c3', name: 'Marcus Thorne', email: 'm.thorne@greenhorizon.io'),
-  _DemoClient(id: 'c4', name: 'Elena Rodriguez', email: 'elena@vibemedia.co'),
-];
+import '../../clients/data/client_repository.dart';
+import '../../clients/domain/models/client_model.dart';
+import '../data/invoice_repository.dart';
+import '../domain/models/invoice_model.dart';
+import '../domain/models/line_item_model.dart';
 
 // Tax rate
 const double _kTaxRate = 0.15;
@@ -59,16 +33,26 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   bool _isGenerating = false;
 
   // ── State ──────────────────────────────────────────────────────────────────
-  _DemoClient? _selectedClient = _kDemoClients.first;
+  ClientModel? _selectedClient;
   DateTime _issueDate = DateTime.now();
   DateTime _dueDate = DateTime.now().add(const Duration(days: 14));
   final _invoiceNumberCtrl =
       TextEditingController(text: _generateInvoiceNumber());
   final _referenceCtrl = TextEditingController();
 
-  final List<_LineItem> _items = [
-    _LineItem(description: 'Web Design Phase 1', category: 'Standard Service', amount: 1200),
-    _LineItem(description: 'Logo Branding Package', category: 'Standard Service', amount: 850),
+  final List<LineItemModel> _items = [
+    const LineItemModel(
+      id: 'item_1',
+      description: 'Web Design Phase 1',
+      category: 'Standard Service',
+      amount: 1200,
+    ),
+    const LineItemModel(
+      id: 'item_2',
+      description: 'Logo Branding Package',
+      category: 'Standard Service',
+      amount: 850,
+    ),
   ];
 
   // ── Computed ───────────────────────────────────────────────────────────────
@@ -134,6 +118,8 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
   // ── Client selector ────────────────────────────────────────────────────────
 
   void _showClientSelector() {
+    final clients = ref.read(clientsStreamProvider).asData?.value ?? kSeedClients;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -176,11 +162,11 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
             Expanded(
               child: ListView.separated(
                 controller: controller,
-                itemCount: _kDemoClients.length,
+                itemCount: clients.length,
                 separatorBuilder: (_, _) =>
                     const Divider(height: 1, color: AppColors.border),
                 itemBuilder: (_, i) {
-                  final c = _kDemoClients[i];
+                  final c = clients[i];
                   final isSelected = c.id == _selectedClient?.id;
                   return ListTile(
                     leading: CircleAvatar(
@@ -188,7 +174,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                       backgroundColor: AppColors.primaryForest
                           .withValues(alpha: 0.12),
                       child: Text(
-                        c.name.substring(0, 1),
+                        c.name.isNotEmpty ? c.name.substring(0, 1).toUpperCase() : '?',
                         style: const TextStyle(
                           fontFamily: 'Inter',
                           fontWeight: FontWeight.w700,
@@ -303,7 +289,8 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
                 final amt = double.tryParse(amountCtrl.text) ?? 0;
                 if (descCtrl.text.trim().isNotEmpty && amt > 0) {
                   setState(() {
-                    _items.add(_LineItem(
+                    _items.add(LineItemModel(
+                      id: 'item_${DateTime.now().millisecondsSinceEpoch}',
                       description: descCtrl.text.trim(),
                       category: catCtrl.text.trim().isEmpty
                           ? 'Standard Service'
@@ -344,16 +331,50 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
     }
 
     setState(() => _isGenerating = true);
-    // TODO(FT-009): persist invoice to Firestore
-    await Future.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
-    setState(() => _isGenerating = false);
+    try {
+      final invoice = InvoiceModel(
+        id: '',
+        invoiceNumber: _invoiceNumberCtrl.text.trim().isNotEmpty
+            ? _invoiceNumberCtrl.text.trim()
+            : _generateInvoiceNumber(),
+        clientId: _selectedClient!.id,
+        clientName: _selectedClient!.name,
+        clientEmail: _selectedClient!.email,
+        clientPhone: _selectedClient!.phone,
+        projectTitle: _referenceCtrl.text.trim().isNotEmpty
+            ? _referenceCtrl.text.trim()
+            : null,
+        status: InvoiceStatus.draft,
+        items: _items,
+        subtotal: _subtotal,
+        taxRate: _kTaxRate,
+        taxAmount: _taxAmount,
+        discountAmount: 0.0,
+        totalAmount: _total,
+        amountPaid: 0.0,
+        issueDate: _issueDate,
+        dueDate: _dueDate,
+        notes: '',
+        paymentTerms: 'Net 14',
+      );
 
-    HapticFeedback.lightImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      _snackBar('Invoice ${_invoiceNumberCtrl.text} saved as draft.'),
-    );
-    context.pop();
+      await ref.read(invoiceRepositoryProvider).addInvoice(invoice);
+
+      if (!mounted) return;
+      setState(() => _isGenerating = false);
+
+      HapticFeedback.lightImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        _snackBar('Invoice ${invoice.invoiceNumber} saved as draft.'),
+      );
+      context.pop();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isGenerating = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        _snackBar('Failed to save invoice: $e', isError: true),
+      );
+    }
   }
 
   SnackBar _snackBar(String msg, {bool isError = false}) => SnackBar(
@@ -957,7 +978,7 @@ class _AddItemButton extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _LineItemCard extends StatelessWidget {
-  final _LineItem item;
+  final LineItemModel item;
   final VoidCallback onDelete;
 
   const _LineItemCard({required this.item, required this.onDelete});

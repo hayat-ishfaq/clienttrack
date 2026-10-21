@@ -5,6 +5,10 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../clients/data/client_repository.dart';
+import '../../clients/domain/models/client_model.dart';
+import '../data/project_repository.dart';
+import '../domain/models/project_model.dart';
 
 // ---------------------------------------------------------------------------
 // Screen: New Project / Edit Project
@@ -21,28 +25,6 @@ enum RateTypeSelection {
   fixed,
   hourly,
 }
-
-class _DemoClient {
-  final String id;
-  final String name;
-  final String company;
-  final String initials;
-
-  const _DemoClient({
-    required this.id,
-    required this.name,
-    required this.company,
-    required this.initials,
-  });
-}
-
-const _kClients = <_DemoClient>[
-  _DemoClient(id: 'c1', name: 'Sarah Johnson', company: 'Brightside Cafe', initials: 'SJ'),
-  _DemoClient(id: 'c2', name: 'Daniel Kim', company: 'Apex Studio', initials: 'DK'),
-  _DemoClient(id: 'c3', name: 'Alex Rivera', company: 'Studio Arc', initials: 'AR'),
-  _DemoClient(id: 'c4', name: 'Marcus Thorne', company: 'Green Horizon', initials: 'MT'),
-  _DemoClient(id: 'c5', name: 'Elena Rodriguez', company: 'Vibe Media', initials: 'ER'),
-];
 
 class NewProjectScreen extends ConsumerStatefulWidget {
   final String? projectId;
@@ -63,12 +45,13 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
   late TextEditingController _descriptionController;
   late TextEditingController _rateController;
 
-  _DemoClient _selectedClient = _kClients.first;
+  ClientModel? _selectedClient;
   DateTime _deadline = DateTime.now().add(const Duration(days: 30));
   ProjectStatusSelection _status = ProjectStatusSelection.notStarted;
   RateTypeSelection _rateType = RateTypeSelection.fixed;
   bool _autoInvoicingEnabled = true;
   bool _isSaving = false;
+  bool _hasLoadedProject = false;
 
   @override
   void initState() {
@@ -76,13 +59,6 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
     _titleController = TextEditingController();
     _descriptionController = TextEditingController();
     _rateController = TextEditingController(text: '0.00');
-
-    if (widget.projectId != null) {
-      _titleController.text = 'Brand Identity Design';
-      _descriptionController.text = 'Complete brand guidelines and vector assets.';
-      _rateController.text = '3200.00';
-      _status = ProjectStatusSelection.inProgress;
-    }
   }
 
   @override
@@ -128,7 +104,7 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
 
   // ── Client Picker Modal ────────────────────────────────────────────────────
 
-  void _showClientPicker() {
+  void _showClientPicker(List<ClientModel> clients) {
     HapticFeedback.lightImpact();
     showModalBottomSheet(
       context: context,
@@ -164,7 +140,7 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-              ..._kClients.map(
+              ...clients.map(
                 (c) => ListTile(
                   leading: CircleAvatar(
                     backgroundColor: AppColors.surfaceMuted,
@@ -181,7 +157,7 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
                     c.name,
                     style: TextStyle(
                       fontFamily: 'Inter',
-                      fontWeight: c.id == _selectedClient.id
+                      fontWeight: c.id == _selectedClient?.id
                           ? FontWeight.w700
                           : FontWeight.w500,
                       color: AppColors.textPrimary,
@@ -195,7 +171,7 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
                       color: AppColors.textSecondary,
                     ),
                   ),
-                  trailing: c.id == _selectedClient.id
+                  trailing: c.id == _selectedClient?.id
                       ? const Icon(Icons.check, color: AppColors.primaryForest)
                       : null,
                   onTap: () {
@@ -218,27 +194,106 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
     HapticFeedback.mediumImpact();
     setState(() => _isSaving = true);
 
-    await Future.delayed(const Duration(milliseconds: 600));
+    try {
+      final rate = double.tryParse(_rateController.text.trim()) ?? 0.0;
+      final status = switch (_status) {
+        ProjectStatusSelection.notStarted => ProjectStatus.notStarted,
+        ProjectStatusSelection.inProgress => ProjectStatus.inProgress,
+        ProjectStatusSelection.completed => ProjectStatus.completed,
+      };
+      final rateType = switch (_rateType) {
+        RateTypeSelection.fixed => RateType.fixed,
+        RateTypeSelection.hourly => RateType.hourly,
+      };
 
-    if (mounted) {
-      setState(() => _isSaving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            widget.projectId != null
-                ? 'Project updated successfully!'
-                : 'Project "${_titleController.text.trim()}" created!',
-            style: const TextStyle(fontFamily: 'Inter'),
-          ),
-          backgroundColor: AppColors.primaryForest,
-        ),
+      final project = ProjectModel(
+        id: widget.projectId ?? '',
+        clientId: _selectedClient?.id ?? '',
+        clientName: _selectedClient?.name ?? 'Client',
+        title: _titleController.text.trim(),
+        description: _descriptionController.text.trim(),
+        status: status,
+        rateType: rateType,
+        budget: rate,
+        deadline: _deadline,
+        progressPct: status == ProjectStatus.completed
+            ? 1.0
+            : (status == ProjectStatus.inProgress ? 0.5 : 0.0),
+        autoInvoicingEnabled: _autoInvoicingEnabled,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
-      context.pop();
+
+      if (widget.projectId != null) {
+        await ref.read(projectRepositoryProvider).updateProject(project);
+      } else {
+        await ref.read(projectRepositoryProvider).addProject(project);
+      }
+
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              widget.projectId != null
+                  ? 'Project updated successfully!'
+                  : 'Project "${_titleController.text.trim()}" created!',
+              style: const TextStyle(fontFamily: 'Inter'),
+            ),
+            backgroundColor: AppColors.primaryForest,
+          ),
+        );
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving project: $e'),
+            backgroundColor: AppColors.overdueRed,
+          ),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final clients = ref.watch(clientsStreamProvider).asData?.value ?? kSeedClients;
+    if (_selectedClient == null && clients.isNotEmpty) {
+      _selectedClient = clients.first;
+    }
+
+    if (widget.projectId != null && !_hasLoadedProject) {
+      final projectAsync = ref.watch(projectByIdProvider(widget.projectId!));
+      final project = projectAsync.asData?.value;
+      if (project != null) {
+        _hasLoadedProject = true;
+        _titleController.text = project.title;
+        _descriptionController.text = project.description;
+        _rateController.text = project.budget.toStringAsFixed(2);
+        _status = project.status == ProjectStatus.completed
+            ? ProjectStatusSelection.completed
+            : (project.status == ProjectStatus.inProgress
+                ? ProjectStatusSelection.inProgress
+                : ProjectStatusSelection.notStarted);
+        _rateType = project.rateType == RateType.hourly
+            ? RateTypeSelection.hourly
+            : RateTypeSelection.fixed;
+        if (project.deadline != null) {
+          _deadline = project.deadline!;
+        }
+        _autoInvoicingEnabled = project.autoInvoicingEnabled;
+        if (project.clientId.isNotEmpty && clients.isNotEmpty) {
+          _selectedClient = clients.cast<ClientModel?>().firstWhere(
+                (c) => c?.id == project.clientId,
+                orElse: () => null,
+              );
+        }
+      }
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: _buildAppBar(),
@@ -260,7 +315,7 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
                     _buildDescriptionField(),
                     const SizedBox(height: 20),
                     // Section 3: Client Selector
-                    _buildClientSelector(),
+                    _buildClientSelector(clients),
                     const SizedBox(height: 20),
                     // Section 4: Deadline
                     _buildDeadlineField(),
@@ -417,7 +472,11 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
 
   // ── Section 3: Client Selector ─────────────────────────────────────────────
 
-  Widget _buildClientSelector() {
+  Widget _buildClientSelector(List<ClientModel> clients) {
+    final clientName = _selectedClient?.name ?? 'Select a client';
+    final clientCompany = _selectedClient?.company ?? 'Tap to select client';
+    final clientInitials = _selectedClient?.initials ?? 'CL';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -433,7 +492,7 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
         ),
         const SizedBox(height: 8),
         InkWell(
-          onTap: _showClientPicker,
+          onTap: () => _showClientPicker(clients),
           borderRadius: BorderRadius.circular(14),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -449,7 +508,7 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
                   radius: 20,
                   backgroundColor: const Color(0xFFF3EBE1),
                   child: Text(
-                    _selectedClient.initials,
+                    clientInitials,
                     style: const TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 14,
@@ -465,7 +524,7 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _selectedClient.name,
+                        clientName,
                         style: const TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 15,
@@ -475,7 +534,7 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        _selectedClient.company,
+                        clientCompany,
                         style: const TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 12,

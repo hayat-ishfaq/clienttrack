@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../shared/widgets/buttons/primary_button.dart';
 import '../../../shared/widgets/buttons/secondary_button.dart';
+import '../domain/models/client_model.dart';
+import '../data/client_repository.dart';
 
 // ---------------------------------------------------------------------------
 // Screen 09: Add / Edit Client
@@ -40,19 +42,26 @@ class _AddEditClientScreenState extends ConsumerState<AddEditClientScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.isEditing) _loadExistingClient();
+    if (widget.isEditing) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadExistingClient();
+      });
+    }
   }
 
-  /// Stub — will be replaced by real Firestore fetch (FT-007)
-  void _loadExistingClient() {
-    _nameCtrl.text = 'Sarah Jenkins';
-    _companyCtrl.text = 'Creative Studio Co.';
-    _emailCtrl.text = 'sarah.j@creative-studio.co';
-    _phoneCtrl.text = '+1 (555) 012-3456';
-    _websiteCtrl.text = 'www.creativestudio.co';
-    _addressCtrl.text = '123 Design Lane, Suite 400, Portland, OR 97204';
-    _notesCtrl.text =
-        'Preferred communication via email. Usually pays within 15 days of invoice issue.';
+  Future<void> _loadExistingClient() async {
+    final client = await ref.read(clientRepositoryProvider).getClient(widget.clientId!);
+    if (client != null && mounted) {
+      setState(() {
+        _nameCtrl.text = client.name;
+        _companyCtrl.text = client.company;
+        _emailCtrl.text = client.email;
+        _phoneCtrl.text = client.phone;
+        _websiteCtrl.text = client.website;
+        _addressCtrl.text = client.address;
+        _notesCtrl.text = client.notes;
+      });
+    }
   }
 
   @override
@@ -74,8 +83,36 @@ class _AddEditClientScreenState extends ConsumerState<AddEditClientScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isSaving = true);
-    // TODO(FT-007): persist to Firestore via ClientRepository
-    await Future.delayed(const Duration(milliseconds: 800));
+    try {
+      final repo = ref.read(clientRepositoryProvider);
+      if (widget.isEditing) {
+        final existing = await repo.getClient(widget.clientId!);
+        final updated = (existing ?? ClientModel(id: widget.clientId!, name: _nameCtrl.text.trim())).copyWith(
+          name: _nameCtrl.text.trim(),
+          company: _companyCtrl.text.trim(),
+          email: _emailCtrl.text.trim(),
+          phone: _phoneCtrl.text.trim(),
+          website: _websiteCtrl.text.trim(),
+          address: _addressCtrl.text.trim(),
+          notes: _notesCtrl.text.trim(),
+        );
+        await repo.updateClient(updated);
+      } else {
+        final newClient = ClientModel(
+          id: '',
+          name: _nameCtrl.text.trim(),
+          company: _companyCtrl.text.trim(),
+          email: _emailCtrl.text.trim(),
+          phone: _phoneCtrl.text.trim(),
+          website: _websiteCtrl.text.trim(),
+          address: _addressCtrl.text.trim(),
+          notes: _notesCtrl.text.trim(),
+          status: ClientStatus.active,
+        );
+        await repo.addClient(newClient);
+      }
+    } catch (_) {}
+
     if (!mounted) return;
     setState(() => _isSaving = false);
 

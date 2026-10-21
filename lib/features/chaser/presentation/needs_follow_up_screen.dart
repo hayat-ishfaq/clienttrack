@@ -2,35 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../app/router/route_names.dart';
 import '../../../app/theme/app_colors.dart';
-
-// ---------------------------------------------------------------------------
-// Model for Follow-up Items (mapped to Firestore in FT-009)
-// ---------------------------------------------------------------------------
-
-class _FollowUpItem {
-  final String id;
-  final String clientName;
-  final String invoiceNumber;
-  final int daysOverdue;
-  final double amountDue;
-  final String dueDate;
-  final String? lastChased;
-  final IconData avatarIcon;
-
-  const _FollowUpItem({
-    required this.id,
-    required this.clientName,
-    required this.invoiceNumber,
-    required this.daysOverdue,
-    required this.amountDue,
-    required this.dueDate,
-    this.lastChased,
-    this.avatarIcon = Icons.business_outlined,
-  });
-}
+import '../../invoices/data/invoice_repository.dart';
+import '../../invoices/domain/models/invoice_model.dart';
 
 // ---------------------------------------------------------------------------
 // Screen: Follow-up / Needs Follow-up
@@ -49,67 +26,20 @@ class _NeedsFollowUpScreenState extends ConsumerState<NeedsFollowUpScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
-  // Demo dataset matching Visily mockup exactly
-  final List<_FollowUpItem> _items = const [
-    _FollowUpItem(
-      id: 'inv-042',
-      clientName: 'Design Studio X',
-      invoiceNumber: 'INV-2024-042',
-      daysOverdue: 14,
-      amountDue: 1250.00,
-      dueDate: 'Oct 12, 2024',
-      lastChased: 'Last chased: 3 days ago',
-      avatarIcon: Icons.image_outlined,
-    ),
-    _FollowUpItem(
-      id: 'inv-045',
-      clientName: 'Sarah Jenkins',
-      invoiceNumber: 'INV-2024-045',
-      daysOverdue: 6,
-      amountDue: 450.00,
-      dueDate: 'Oct 20, 2024',
-      lastChased: 'No reminders sent',
-      avatarIcon: Icons.person_outline_rounded,
-    ),
-    _FollowUpItem(
-      id: 'inv-039',
-      clientName: 'Acme Corp',
-      invoiceNumber: 'INV-2024-039',
-      daysOverdue: 28,
-      amountDue: 3400.00,
-      dueDate: 'Sep 28, 2024',
-      lastChased: 'Last chased: Oct 15',
-      avatarIcon: Icons.apartment_rounded,
-    ),
-    _FollowUpItem(
-      id: 'inv-048',
-      clientName: 'Michael Chen',
-      invoiceNumber: 'INV-2024-048',
-      daysOverdue: 4,
-      amountDue: 920.00,
-      dueDate: 'Oct 22, 2024',
-      lastChased: 'No reminders sent',
-      avatarIcon: Icons.person_outline_rounded,
-    ),
-  ];
-
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
 
-  List<_FollowUpItem> get _filteredItems {
-    if (_searchQuery.trim().isEmpty) return _items;
+  List<InvoiceModel> _filterItems(List<InvoiceModel> items) {
+    if (_searchQuery.trim().isEmpty) return items;
     final q = _searchQuery.toLowerCase();
-    return _items.where((item) {
+    return items.where((item) {
       return item.clientName.toLowerCase().contains(q) ||
           item.invoiceNumber.toLowerCase().contains(q);
     }).toList();
   }
-
-  double get _totalOutstanding =>
-      _filteredItems.fold(0.0, (sum, item) => sum + item.amountDue);
 
   // ── Pro Upgrade Modal ──────────────────────────────────────────────────────
 
@@ -270,7 +200,7 @@ class _NeedsFollowUpScreenState extends ConsumerState<NeedsFollowUpScreen> {
 
   // ── Chase Action ───────────────────────────────────────────────────────────
 
-  void _onChaseItem(_FollowUpItem item) {
+  void _onChaseItem(InvoiceModel item) {
     HapticFeedback.lightImpact();
     context.pushNamed(
       AppRoutes.reminderComposerName,
@@ -280,7 +210,14 @@ class _NeedsFollowUpScreenState extends ConsumerState<NeedsFollowUpScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _filteredItems;
+    final itemsAsync = ref.watch(needsFollowUpStreamProvider);
+    final allItems = itemsAsync.asData?.value ??
+        kSeedInvoices
+            .where((i) => i.isOverdue || i.status == InvoiceStatus.overdue)
+            .toList();
+    final filtered = _filterItems(allItems);
+    final totalOutstanding =
+        filtered.fold(0.0, (sum, item) => sum + item.balanceDue);
 
     return Scaffold(
       backgroundColor: const Color(0xFFFBFDFB),
@@ -295,7 +232,7 @@ class _NeedsFollowUpScreenState extends ConsumerState<NeedsFollowUpScreen> {
           _buildSearchBar(),
           const SizedBox(height: 16),
           // Stats row
-          _buildStatsHeader(filtered.length),
+          _buildStatsHeader(filtered.length, totalOutstanding),
           const SizedBox(height: 12),
           // List of cards
           if (filtered.isEmpty)
@@ -474,7 +411,7 @@ class _NeedsFollowUpScreenState extends ConsumerState<NeedsFollowUpScreen> {
 
   // ── Stats Header ───────────────────────────────────────────────────────────
 
-  Widget _buildStatsHeader(int count) {
+  Widget _buildStatsHeader(int count, double totalOutstanding) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -488,7 +425,7 @@ class _NeedsFollowUpScreenState extends ConsumerState<NeedsFollowUpScreen> {
           ),
         ),
         Text(
-          'Total: \$${_totalOutstanding.toStringAsFixed(2)}',
+          'Total: \$${totalOutstanding.toStringAsFixed(2)}',
           style: const TextStyle(
             fontFamily: 'Inter',
             fontSize: 13,
@@ -502,7 +439,11 @@ class _NeedsFollowUpScreenState extends ConsumerState<NeedsFollowUpScreen> {
 
   // ── Follow-Up Card ─────────────────────────────────────────────────────────
 
-  Widget _buildFollowUpCard(_FollowUpItem item) {
+  Widget _buildFollowUpCard(InvoiceModel item) {
+    final lastChasedText = item.lastReminderSentAt != null
+        ? 'Last chased: ${DateFormat.MMMd().format(item.lastReminderSentAt!)}'
+        : 'No reminders sent';
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -518,7 +459,6 @@ class _NeedsFollowUpScreenState extends ConsumerState<NeedsFollowUpScreen> {
       ),
       child: InkWell(
         onTap: () {
-          // Open invoice detail
           context.pushNamed(
             AppRoutes.invoiceDetailName,
             pathParameters: {'id': item.id},
@@ -537,14 +477,22 @@ class _NeedsFollowUpScreenState extends ConsumerState<NeedsFollowUpScreen> {
                   Container(
                     width: 40,
                     height: 40,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEDF1F5), // Muted grey/blue
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFEDF1F5),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(
-                      item.avatarIcon,
-                      size: 20,
-                      color: AppColors.textSecondary,
+                    child: Center(
+                      child: Text(
+                        item.clientName.isNotEmpty
+                            ? item.clientName.substring(0, 1).toUpperCase()
+                            : 'C',
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primaryForest,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -580,7 +528,7 @@ class _NeedsFollowUpScreenState extends ConsumerState<NeedsFollowUpScreen> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFDE8E8), // Light red
+                      color: const Color(0xFFFDE8E8),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -618,7 +566,7 @@ class _NeedsFollowUpScreenState extends ConsumerState<NeedsFollowUpScreen> {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        '\$${item.amountDue.toStringAsFixed(2)}',
+                        '\$${item.balanceDue.toStringAsFixed(2)}',
                         style: const TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 16,
@@ -643,7 +591,7 @@ class _NeedsFollowUpScreenState extends ConsumerState<NeedsFollowUpScreen> {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        item.dueDate,
+                        DateFormat.MMMd().format(item.dueDate),
                         style: const TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 13,
@@ -669,7 +617,7 @@ class _NeedsFollowUpScreenState extends ConsumerState<NeedsFollowUpScreen> {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        item.lastChased ?? 'No reminders sent',
+                        lastChasedText,
                         style: const TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 12,

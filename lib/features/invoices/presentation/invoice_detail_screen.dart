@@ -2,48 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../app/router/route_names.dart';
 import '../../../app/theme/app_colors.dart';
-
-// ---------------------------------------------------------------------------
-// Data models (Demo stubs - mapped to Firestore in FT-009)
-// ---------------------------------------------------------------------------
-
-enum InvoiceStatus {
-  overdue,
-  paid,
-  pending,
-  draft,
-}
-
-class _LineItem {
-  final String title;
-  final int quantity;
-  final double unitPrice;
-
-  const _LineItem({
-    required this.title,
-    required this.quantity,
-    required this.unitPrice,
-  });
-
-  double get total => quantity * unitPrice;
-}
-
-class _ReminderEntry {
-  final String title;
-  final String type;
-  final String date;
-  final IconData icon;
-
-  const _ReminderEntry({
-    required this.title,
-    required this.type,
-    required this.date,
-    required this.icon,
-  });
-}
+import '../../chaser/data/reminder_repository.dart';
+import '../../chaser/domain/models/reminder_log_model.dart';
+import '../data/invoice_repository.dart';
+import '../domain/models/invoice_model.dart';
 
 // ---------------------------------------------------------------------------
 // Screen: Invoice Detail
@@ -63,68 +29,24 @@ class InvoiceDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
-  // Invoice state (live toggles)
-  late InvoiceStatus _status;
-  late int _overdueDays;
-  final String _clientName = 'Sarah Johnson';
-  final String _companyName = 'Brightside Cafe';
-  final String _clientId = 'c1';
-  final String _issueDate = 'Sep 14';
-  final String _dueDate = 'Sep 28';
-  final String _currency = '\$';
-
-  final List<_LineItem> _lineItems = const [
-    _LineItem(
-      title: 'Landing page copy',
-      quantity: 1,
-      unitPrice: 450.00,
-    ),
-  ];
-
-  final List<_ReminderEntry> _reminders = const [
-    _ReminderEntry(
-      title: 'Shared · Sep 29',
-      type: 'Friendly reminder',
-      date: 'Sep 29',
-      icon: Icons.share_rounded,
-    ),
-    _ReminderEntry(
-      title: 'Shared · Oct 1',
-      type: 'Professional reminder',
-      date: 'Oct 1',
-      icon: Icons.share_rounded,
-    ),
-  ];
-
-  double get _totalAmount =>
-      _lineItems.fold(0.0, (sum, item) => sum + item.total);
-
-  @override
-  void initState() {
-    super.initState();
-    _status = InvoiceStatus.overdue;
-    _overdueDays = 3;
-  }
-
-  void _togglePaidStatus() {
+  Future<void> _togglePaidStatus(InvoiceModel invoice) async {
     HapticFeedback.mediumImpact();
-    setState(() {
-      if (_status == InvoiceStatus.paid) {
-        _status = InvoiceStatus.overdue;
-      } else {
-        _status = InvoiceStatus.paid;
-      }
-    });
+    final newStatus = invoice.status == InvoiceStatus.paid
+        ? (invoice.isOverdue ? InvoiceStatus.overdue : InvoiceStatus.sent)
+        : InvoiceStatus.paid;
 
+    await ref.read(invoiceRepositoryProvider).updateInvoiceStatus(invoice.id, newStatus);
+
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          _status == InvoiceStatus.paid
-              ? 'Invoice #${widget.invoiceId} marked as paid!'
-              : 'Invoice marked as unpaid (Overdue)',
+          newStatus == InvoiceStatus.paid
+              ? 'Invoice #${invoice.invoiceNumber} marked as paid!'
+              : 'Invoice marked as unpaid',
           style: const TextStyle(fontFamily: 'Inter'),
         ),
-        backgroundColor: _status == InvoiceStatus.paid
+        backgroundColor: newStatus == InvoiceStatus.paid
             ? AppColors.primaryForest
             : AppColors.overdueRed,
         duration: const Duration(seconds: 2),
@@ -132,7 +54,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
     );
   }
 
-  void _showShareReminderSheet() {
+  void _showShareReminderSheet(InvoiceModel invoice) {
     HapticFeedback.lightImpact();
     showModalBottomSheet(
       context: context,
@@ -168,9 +90,9 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
-                'Choose a reminder template to nudge Sarah Johnson politely.',
-                style: TextStyle(
+              Text(
+                'Choose a reminder template to nudge ${invoice.clientName} politely.',
+                style: const TextStyle(
                   fontFamily: 'Inter',
                   fontSize: 13,
                   color: AppColors.textSecondary,
@@ -206,7 +128,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
               _buildReminderOption(
                 icon: Icons.warning_amber_rounded,
                 title: 'Urgent Overdue Notice',
-                subtitle: 'Explicit mention of 3-day overdue status.',
+                subtitle: 'Explicit mention of overdue status.',
                 onTap: () {
                   Navigator.pop(ctx);
                   context.pushNamed(
@@ -456,7 +378,10 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
         pathParameters: {'id': widget.invoiceId},
       );
     } else if (value == 'delete') {
-      _confirmDelete();
+      final invoice = ref.read(invoiceByIdProvider(widget.invoiceId)).asData?.value;
+      if (invoice != null) {
+        _confirmDelete(invoice);
+      }
     } else if (value == 'duplicate') {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -467,7 +392,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
     }
   }
 
-  void _confirmDelete() {
+  void _confirmDelete(InvoiceModel invoice) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -477,7 +402,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
           style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700),
         ),
         content: Text(
-          'Are you sure you want to delete invoice #${widget.invoiceId}? This action cannot be undone.',
+          'Are you sure you want to delete invoice #${invoice.invoiceNumber}? This action cannot be undone.',
           style: const TextStyle(fontFamily: 'Inter', color: AppColors.textSecondary),
         ),
         actions: [
@@ -486,9 +411,10 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
             child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              context.pop();
+              await ref.read(invoiceRepositoryProvider).deleteInvoice(invoice.id);
+              if (mounted) context.pop();
             },
             child: const Text('Delete', style: TextStyle(color: AppColors.overdueRed)),
           ),
@@ -499,9 +425,19 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final invoiceAsync = ref.watch(invoiceByIdProvider(widget.invoiceId));
+    final invoice = invoiceAsync.asData?.value ??
+        kSeedInvoices.firstWhere(
+          (i) => i.id == widget.invoiceId,
+          orElse: () => kSeedInvoices.first,
+        );
+
+    final remindersAsync = ref.watch(invoiceRemindersStreamProvider(invoice.id));
+    final reminders = remindersAsync.asData?.value ?? const <ReminderLogModel>[];
+
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: _buildAppBar(),
+      appBar: _buildAppBar(invoice),
       body: Column(
         children: [
           Expanded(
@@ -511,19 +447,19 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildTotalAmountCard(),
+                  _buildTotalAmountCard(invoice),
                   const SizedBox(height: 16),
-                  _buildClientAndDatesCard(),
+                  _buildClientAndDatesCard(invoice),
                   const SizedBox(height: 16),
-                  _buildLineItemsCard(),
+                  _buildLineItemsCard(invoice),
                   const SizedBox(height: 24),
-                  _buildReminderHistorySection(),
+                  _buildReminderHistorySection(reminders, invoice),
                   const SizedBox(height: 24),
                 ],
               ),
             ),
           ),
-          _buildBottomActionArea(),
+          _buildBottomActionArea(invoice),
         ],
       ),
     );
@@ -531,7 +467,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
 
   // ── App Bar ────────────────────────────────────────────────────────────────
 
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(InvoiceModel invoice) {
     return AppBar(
       backgroundColor: Colors.white,
       elevation: 0,
@@ -541,7 +477,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
         onPressed: () => context.pop(),
       ),
       title: Text(
-        'Invoice #${widget.invoiceId}',
+        'Invoice #${invoice.invoiceNumber}',
         style: const TextStyle(
           fontFamily: 'Inter',
           fontSize: 18,
@@ -568,10 +504,26 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
 
   // ── Total Amount Card ──────────────────────────────────────────────────────
 
-  Widget _buildTotalAmountCard() {
-    final isPaid = _status == InvoiceStatus.paid;
-    final accentColor = isPaid ? AppColors.paidTeal : AppColors.overdueRed;
-    final bgTint = isPaid ? AppColors.paidTealBg : const Color(0xFFFFF9F9);
+  Widget _buildTotalAmountCard(InvoiceModel invoice) {
+    final isPaid = invoice.status == InvoiceStatus.paid;
+    final isOverdue = invoice.isOverdue || invoice.status == InvoiceStatus.overdue;
+    final accentColor = isPaid
+        ? AppColors.paidTeal
+        : (isOverdue ? AppColors.overdueRed : AppColors.sentBlue);
+    final bgTint = isPaid
+        ? AppColors.paidTealBg
+        : (isOverdue ? const Color(0xFFFFF9F9) : const Color(0xFFF8FAFC));
+
+    String statusText;
+    if (isPaid) {
+      statusText = 'Paid';
+    } else if (isOverdue) {
+      statusText = 'Overdue · ${invoice.daysOverdue} days';
+    } else if (invoice.status == InvoiceStatus.sent) {
+      statusText = 'Sent · Due ${DateFormat.MMMd().format(invoice.dueDate)}';
+    } else {
+      statusText = invoice.status.label;
+    }
 
     return Container(
       decoration: BoxDecoration(
@@ -594,7 +546,6 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Left colored vertical indicator bar matching mockup
             Container(
               width: 5,
               decoration: BoxDecoration(
@@ -625,7 +576,6 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                             color: accentColor,
                           ),
                         ),
-                        // Status pill badge
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,
@@ -636,9 +586,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: Text(
-                            isPaid
-                                ? 'Paid'
-                                : 'Overdue · $_overdueDays days',
+                            statusText,
                             style: const TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 11,
@@ -651,7 +599,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '$_currency${_totalAmount.toStringAsFixed(2)}',
+                      '\$${invoice.totalAmount.toStringAsFixed(2)}',
                       style: const TextStyle(
                         fontFamily: 'Inter',
                         fontSize: 32,
@@ -672,7 +620,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
 
   // ── Client & Dates Card ────────────────────────────────────────────────────
 
-  Widget _buildClientAndDatesCard() {
+  Widget _buildClientAndDatesCard(InvoiceModel invoice) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -684,10 +632,9 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
           // Client section
           InkWell(
             onTap: () {
-              // Navigate to client detail
               context.pushNamed(
                 AppRoutes.clientDetailName,
-                pathParameters: {'id': _clientId},
+                pathParameters: {'id': invoice.clientId},
               );
             },
             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
@@ -702,10 +649,18 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                       color: AppColors.surfaceMuted,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
-                      Icons.person_outline_rounded,
-                      size: 20,
-                      color: AppColors.textSecondary,
+                    child: Center(
+                      child: Text(
+                        invoice.clientName.isNotEmpty
+                            ? invoice.clientName.substring(0, 1).toUpperCase()
+                            : 'C',
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primaryForest,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -725,7 +680,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          _clientName,
+                          invoice.clientName,
                           style: const TextStyle(
                             fontFamily: 'Inter',
                             fontSize: 15,
@@ -733,14 +688,15 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                             color: AppColors.textPrimary,
                           ),
                         ),
-                        Text(
-                          _companyName,
-                          style: const TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 13,
-                            color: AppColors.textSecondary,
+                        if (invoice.projectTitle != null && invoice.projectTitle!.isNotEmpty)
+                          Text(
+                            invoice.projectTitle!,
+                            style: const TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -785,7 +741,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              _issueDate,
+                              DateFormat.MMMd().format(invoice.issueDate),
                               style: const TextStyle(
                                 fontFamily: 'Inter',
                                 fontSize: 14,
@@ -810,7 +766,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                         Icon(
                           Icons.access_time_rounded,
                           size: 18,
-                          color: _status == InvoiceStatus.overdue
+                          color: invoice.isOverdue
                               ? AppColors.overdueRed
                               : AppColors.textSecondary,
                         ),
@@ -830,7 +786,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              _dueDate,
+                              DateFormat.MMMd().format(invoice.dueDate),
                               style: const TextStyle(
                                 fontFamily: 'Inter',
                                 fontSize: 14,
@@ -854,7 +810,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
 
   // ── Line Items Card ────────────────────────────────────────────────────────
 
-  Widget _buildLineItemsCard() {
+  Widget _buildLineItemsCard(InvoiceModel invoice) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -880,49 +836,58 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
           ),
           const Divider(height: 1, color: AppColors.border),
           // Items
-          ..._lineItems.map(
-            (item) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item.title,
-                          style: const TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
+          if (invoice.items.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'No line items specified',
+                style: TextStyle(fontFamily: 'Inter', color: AppColors.textSecondary),
+              ),
+            )
+          else
+            ...invoice.items.map(
+              (item) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.description,
+                            style: const TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Qty ${item.quantity} × $_currency${item.unitPrice.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontFamily: 'Inter',
-                            fontSize: 13,
-                            color: AppColors.textSecondary,
+                          const SizedBox(height: 4),
+                          Text(
+                            'Qty ${item.quantity} × \$${item.rate.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  Text(
-                    '$_currency${item.total.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+                    Text(
+                      '\$${item.amount.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
           const Divider(height: 1, color: AppColors.border),
           // Total Row
           Padding(
@@ -941,7 +906,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                   ),
                 ),
                 Text(
-                  '$_currency${_totalAmount.toStringAsFixed(2)}',
+                  '\$${invoice.totalAmount.toStringAsFixed(2)}',
                   style: const TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 16,
@@ -959,7 +924,10 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
 
   // ── Reminder History Section ───────────────────────────────────────────────
 
-  Widget _buildReminderHistorySection() {
+  Widget _buildReminderHistorySection(
+    List<ReminderLogModel> reminders,
+    InvoiceModel invoice,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -974,14 +942,23 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        // Timeline
-        ...List.generate(_reminders.length, (index) {
-          final item = _reminders[index];
-          return _buildTimelineItem(
-            entry: item,
+        if (reminders.isNotEmpty)
+          ...List.generate(reminders.length, (index) {
+            final item = reminders[index];
+            return _buildTimelineItem(
+              title: '${item.channel.toUpperCase()} · ${DateFormat.MMMd().format(item.sentAt)}',
+              subtitle: '${item.tone.toUpperCase()} reminder · ${item.recipient}',
+              icon: Icons.send_rounded,
+              isLast: false,
+            );
+          })
+        else
+          _buildTimelineItem(
+            title: 'No reminders sent yet',
+            subtitle: 'Tap "Share reminder" below to nudge client.',
+            icon: Icons.notifications_none_rounded,
             isLast: false,
-          );
-        }),
+          ),
         // PRO Locked History Item
         _buildProHistoryTimelineItem(),
       ],
@@ -989,7 +966,9 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
   }
 
   Widget _buildTimelineItem({
-    required _ReminderEntry entry,
+    required String title,
+    required String subtitle,
+    required IconData icon,
     required bool isLast,
   }) {
     return IntrinsicHeight(
@@ -1005,11 +984,11 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                   width: 26,
                   height: 26,
                   decoration: const BoxDecoration(
-                    color: Color(0xFF10B981), // Green circle matching design
+                    color: Color(0xFF10B981),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    entry.icon,
+                    icon,
                     size: 14,
                     color: Colors.white,
                   ),
@@ -1034,7 +1013,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    entry.title,
+                    title,
                     style: const TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 13,
@@ -1044,7 +1023,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    entry.type,
+                    subtitle,
                     style: const TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 14,
@@ -1182,8 +1161,8 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
 
   // ── Bottom Action Area ─────────────────────────────────────────────────────
 
-  Widget _buildBottomActionArea() {
-    final isPaid = _status == InvoiceStatus.paid;
+  Widget _buildBottomActionArea(InvoiceModel invoice) {
+    final isPaid = invoice.status == InvoiceStatus.paid;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
@@ -1210,7 +1189,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
               width: double.infinity,
               height: 48,
               child: ElevatedButton(
-                onPressed: _showShareReminderSheet,
+                onPressed: () => _showShareReminderSheet(invoice),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryForest,
                   foregroundColor: Colors.white,
@@ -1243,7 +1222,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
               width: double.infinity,
               height: 48,
               child: OutlinedButton(
-                onPressed: _togglePaidStatus,
+                onPressed: () => _togglePaidStatus(invoice),
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: AppColors.border),
                   shape: RoundedRectangleBorder(

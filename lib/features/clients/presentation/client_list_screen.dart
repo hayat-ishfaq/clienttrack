@@ -5,83 +5,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/router/route_names.dart';
 import '../../../app/theme/app_colors.dart';
-
-// ---------------------------------------------------------------------------
-// Demo data model (replaces real Firestore until FT-007 is wired)
-// ---------------------------------------------------------------------------
-
-enum _ClientStatus { active, pending, inactive }
-
-class _DemoClient {
-  final String id;
-  final String name;
-  final String role;
-  final String company;
-  final _ClientStatus status;
-  final int projectCount;
-  final String timeAgo;
-  final bool hasStar;
-  final Color presenceDot;
-
-  const _DemoClient({
-    required this.id,
-    required this.name,
-    required this.role,
-    required this.company,
-    required this.status,
-    required this.projectCount,
-    required this.timeAgo,
-    this.hasStar = false,
-    required this.presenceDot,
-  });
-}
-
-const _kDemoClients = <_DemoClient>[
-  _DemoClient(
-    id: 'c1',
-    name: 'Alex Rivera',
-    role: 'Creative Director',
-    company: 'Studio Arc',
-    status: _ClientStatus.active,
-    projectCount: 3,
-    timeAgo: '2 days ago',
-    hasStar: true,
-    presenceDot: Color(0xFF22C55E),
-  ),
-  _DemoClient(
-    id: 'c2',
-    name: 'Sarah Chen',
-    role: 'Product Manager',
-    company: 'TechFlow Inc.',
-    status: _ClientStatus.pending,
-    projectCount: 1,
-    timeAgo: '5 hours ago',
-    hasStar: false,
-    presenceDot: Color(0xFFE0A030),
-  ),
-  _DemoClient(
-    id: 'c3',
-    name: 'Marcus Thorne',
-    role: 'Founder',
-    company: 'Green Horizon',
-    status: _ClientStatus.active,
-    projectCount: 5,
-    timeAgo: '1 week ago',
-    hasStar: true,
-    presenceDot: Color(0xFF22C55E),
-  ),
-  _DemoClient(
-    id: 'c4',
-    name: 'Elena Rodriguez',
-    role: 'Marketing Lead',
-    company: 'Vibe Media',
-    status: _ClientStatus.inactive,
-    projectCount: 0,
-    timeAgo: '2 weeks ago',
-    hasStar: false,
-    presenceDot: Color(0xFFD64545),
-  ),
-];
+import '../domain/models/client_model.dart';
+import '../data/client_repository.dart';
 
 // ---------------------------------------------------------------------------
 // Screen 08: Client List
@@ -99,7 +24,6 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen>
     with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
-  List<_DemoClient> _filtered = List.of(_kDemoClients);
 
   // Free-tier client limit before paywall triggers
   static const int _freeLimit = 3;
@@ -118,22 +42,13 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen>
   }
 
   void _onSearch() {
-    final q = _searchController.text.toLowerCase().trim();
     setState(() {
-      _query = q;
-      _filtered = q.isEmpty
-          ? List.of(_kDemoClients)
-          : _kDemoClients
-              .where((c) =>
-                  c.name.toLowerCase().contains(q) ||
-                  c.company.toLowerCase().contains(q) ||
-                  c.role.toLowerCase().contains(q))
-              .toList();
+      _query = _searchController.text.toLowerCase().trim();
     });
   }
 
-  void _onFabTap() {
-    if (_kDemoClients.length >= _freeLimit) {
+  void _onFabTap(int count) {
+    if (count >= _freeLimit) {
       _showLimitBottomSheet();
     } else {
       context.push(AppRoutes.addClient);
@@ -157,7 +72,7 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen>
     );
   }
 
-  void _showClientOptions(BuildContext context, _DemoClient client) {
+  void _showClientOptions(BuildContext context, ClientModel client) {
     HapticFeedback.lightImpact();
     showModalBottomSheet(
       context: context,
@@ -173,6 +88,17 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen>
 
   @override
   Widget build(BuildContext context) {
+    final clientsAsync = ref.watch(clientsStreamProvider);
+    final allClients = clientsAsync.asData?.value ?? [];
+    final filtered = _query.isEmpty
+        ? allClients
+        : allClients
+            .where((c) =>
+                c.name.toLowerCase().contains(_query) ||
+                c.company.toLowerCase().contains(_query) ||
+                c.role.toLowerCase().contains(_query))
+            .toList();
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       body: SafeArea(
@@ -181,7 +107,7 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Top App Bar ────────────────────────────────────────────────
-            _buildAppBar(context),
+            _buildAppBar(context, allClients.length),
 
             // ── Scrollable body ────────────────────────────────────────────
             Expanded(
@@ -202,7 +128,7 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen>
                           _buildProBanner(),
                           const SizedBox(height: 24),
                           // Section header
-                          _buildSectionHeader(),
+                          _buildSectionHeader(filtered.length),
                           const SizedBox(height: 12),
                         ],
                       ),
@@ -210,7 +136,7 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen>
                   ),
 
                   // Client cards
-                  if (_filtered.isEmpty)
+                  if (filtered.isEmpty)
                     SliverToBoxAdapter(child: _buildEmptyState())
                   else
                     SliverList(
@@ -219,15 +145,15 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen>
                           padding: const EdgeInsets.symmetric(
                               horizontal: 20, vertical: 5),
                           child: _ClientCard(
-                            client: _filtered[i],
+                            client: filtered[i],
                             onTap: () => context.push(
-                              '/clients/${_filtered[i].id}',
+                              '/clients/${filtered[i].id}',
                             ),
                             onOptions: () =>
-                                _showClientOptions(context, _filtered[i]),
+                                _showClientOptions(context, filtered[i]),
                           ),
                         ),
-                        childCount: _filtered.length,
+                        childCount: filtered.length,
                       ),
                     ),
 
@@ -241,13 +167,13 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen>
       ),
 
       // ── FAB ──────────────────────────────────────────────────────────────
-      floatingActionButton: _buildFab(),
+      floatingActionButton: _buildFab(allClients.length),
     );
   }
 
   // ── Sub-builders ──────────────────────────────────────────────────────────
 
-  Widget _buildAppBar(BuildContext context) {
+  Widget _buildAppBar(BuildContext context, int count) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 16, 0),
       child: Row(
@@ -267,7 +193,7 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen>
           // Add-client icon button
           _CircleIconButton(
             icon: Icons.person_add_alt_1_rounded,
-            onTap: _onFabTap,
+            onTap: () => _onFabTap(count),
           ),
           const SizedBox(width: 4),
         ],
@@ -449,12 +375,12 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen>
     );
   }
 
-  Widget _buildSectionHeader() {
+  Widget _buildSectionHeader(int count) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
-          _query.isEmpty ? 'Recently Contacted' : 'Results (${_filtered.length})',
+          _query.isEmpty ? 'Recently Contacted' : 'Results ($count)',
           style: const TextStyle(
             fontFamily: 'Inter',
             fontSize: 17,
@@ -489,7 +415,7 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen>
             Container(
               width: 72,
               height: 72,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: AppColors.surfaceMuted,
                 shape: BoxShape.circle,
               ),
@@ -526,9 +452,9 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen>
     );
   }
 
-  Widget _buildFab() {
+  Widget _buildFab(int count) {
     return FloatingActionButton(
-      onPressed: _onFabTap,
+      onPressed: () => _onFabTap(count),
       backgroundColor: AppColors.primaryForest,
       elevation: 4,
       shape: const CircleBorder(),
@@ -542,7 +468,7 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen>
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _ClientCard extends StatelessWidget {
-  final _DemoClient client;
+  final ClientModel client;
   final VoidCallback onTap;
   final VoidCallback onOptions;
 
@@ -788,7 +714,7 @@ class _ClientCard extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _StatusPill extends StatelessWidget {
-  final _ClientStatus status;
+  final ClientStatus status;
   const _StatusPill({required this.status});
 
   @override
@@ -798,15 +724,15 @@ class _StatusPill extends StatelessWidget {
     final String label;
 
     switch (status) {
-      case _ClientStatus.active:
+      case ClientStatus.active:
         bg = AppColors.paidTealBg;
         fg = AppColors.paidTeal;
         label = 'Active';
-      case _ClientStatus.pending:
+      case ClientStatus.pending:
         bg = AppColors.dueSoonAmberBg;
         fg = AppColors.dueSoonAmber;
         label = 'Pending';
-      case _ClientStatus.inactive:
+      case ClientStatus.inactive:
         bg = AppColors.draftGreyBg;
         fg = AppColors.draftGrey;
         label = 'Inactive';
@@ -869,12 +795,12 @@ class _CircleIconButton extends StatelessWidget {
 // Client 3-dot Options Sheet
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _ClientOptionsSheet extends StatelessWidget {
-  final _DemoClient client;
+class _ClientOptionsSheet extends ConsumerWidget {
+  final ClientModel client;
   const _ClientOptionsSheet({required this.client});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -966,7 +892,7 @@ class _ClientOptionsSheet extends StatelessWidget {
               ),
               onTap: () {
                 Navigator.pop(context);
-                _confirmDelete(context, client);
+                _confirmDelete(context, client, ref);
               },
             ),
           ],
@@ -975,7 +901,7 @@ class _ClientOptionsSheet extends StatelessWidget {
     );
   }
 
-  void _confirmDelete(BuildContext context, _DemoClient client) {
+  void _confirmDelete(BuildContext context, ClientModel client, WidgetRef ref) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1005,7 +931,10 @@ class _ClientOptionsSheet extends StatelessWidget {
             ),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await ref.read(clientRepositoryProvider).deleteClient(client.id);
+            },
             child: const Text(
               'Delete',
               style: TextStyle(
