@@ -18,6 +18,7 @@ import '../../features/clients/presentation/client_detail_screen.dart';
 import '../../features/projects/presentation/project_list_screen.dart';
 import '../../features/invoices/presentation/create_invoice_screen.dart';
 import '../../features/invoices/presentation/invoice_detail_screen.dart';
+import '../../features/invoices/presentation/pdf_preview_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final GlobalKey<NavigatorState> _homeNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'home');
@@ -201,10 +202,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.pdfPreview,
         name: AppRoutes.pdfPreviewName,
-        builder: (context, state) => PlaceholderScreen(
-          title: 'Invoice PDF Preview',
-          subtitle: 'Preview invoice: ${state.pathParameters['id']}',
-          icon: Icons.picture_as_pdf_outlined,
+        builder: (context, state) => PdfPreviewScreen(
+          invoiceId: state.pathParameters['id'] ?? 'INV-2024-001',
         ),
       ),
 
