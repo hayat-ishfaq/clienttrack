@@ -14,6 +14,7 @@ import '../../features/auth/presentation/forgot_password_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/clients/presentation/client_list_screen.dart';
 import '../../features/clients/presentation/add_edit_client_screen.dart';
+import '../../features/clients/presentation/client_detail_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final GlobalKey<NavigatorState> _homeNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'home');
@@ -137,10 +138,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.clientDetail,
         name: AppRoutes.clientDetailName,
-        builder: (context, state) => PlaceholderScreen(
-          title: 'Client Details',
-          subtitle: 'Client: ${state.pathParameters['id']}',
-          icon: Icons.person_outline,
+        builder: (context, state) => ClientDetailScreen(
+          clientId: state.pathParameters['id'] ?? '',
         ),
       ),
       GoRoute(
