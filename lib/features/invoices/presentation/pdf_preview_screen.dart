@@ -2,16 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../paywall/data/revenue_cat_service.dart';
+import '../../settings/data/business_profile_repository.dart';
+import '../../settings/domain/models/business_profile_model.dart';
+import '../data/invoice_repository.dart';
+import '../data/pdf_invoice_service.dart';
+import '../domain/models/invoice_model.dart';
 
 // ---------------------------------------------------------------------------
 // Screen: PDF Preview / Final Review
-// Conforms to Visily Mockup — Invoice INV-2024-001 Preview
+// Conforms to Visily Mockup — Invoice Preview Screen
 // ---------------------------------------------------------------------------
 
 class PdfPreviewScreen extends ConsumerStatefulWidget {
@@ -29,331 +33,16 @@ class PdfPreviewScreen extends ConsumerStatefulWidget {
 class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
   bool _isExporting = false;
 
-  // Invoice demo data (matching Visily mockup)
-  final String _invoiceNumber = 'INV-2024-001';
-  final String _status = 'DRAFT';
-
-  final String _companyName = 'ClientTrack Inc.';
-  final String _companyAddress1 = '123 Freelance Way';
-  final String _companyAddress2 = 'Digital Valley, CA 94025';
-  final String _companyCountry = 'United States';
-
-  final String _clientName = 'Alex Thompson';
-  final String _clientCompany = 'Acme Design Studio';
-  final String _clientStreet = '456 Creative St.';
-  final String _clientCity = 'San Francisco, CA 94103';
-  final String _clientEmail = 'alex@acmedesign.co';
-
-  final String _issueDate = 'May 24, 2024';
-  final String _dueDate = 'Jun 07, 2024';
-
-  final List<Map<String, dynamic>> _lineItems = const [
-    {
-      'description': 'Brand Identity Design - Phase 1',
-      'qty': '1',
-      'amount': '\$1,200.00',
-      'numAmount': 1200.0,
-    },
-    {
-      'description': 'Mobile App Wireframing (15 screens)',
-      'qty': '40h',
-      'amount': '\$2,400.00',
-      'numAmount': 2400.0,
-    },
-    {
-      'description': 'Client Consultation & Research',
-      'qty': '5h',
-      'amount': '\$350.00',
-      'numAmount': 350.0,
-    },
-  ];
-
-  final String _subtotal = '\$3,950.00';
-  final String _tax = '\$0.00';
-  final String _total = '\$3,950.00';
-
-  final String _notes =
-      'Thank you for your business. Payment is expected within 14 days. Please include invoice number INV-2024-001 in your transfer description.';
-
-  // ── PDF Generation Logic ───────────────────────────────────────────────────
-
-  Future<Uint8List> _generatePdfBytes() async {
-    final pdf = pw.Document();
-
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(36),
-        build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              // Header
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'INVOICE',
-                        style: pw.TextStyle(
-                          fontSize: 24,
-                          fontWeight: pw.FontWeight.bold,
-                          color: const PdfColor.fromInt(0xFF1B2A1E),
-                        ),
-                      ),
-                      pw.SizedBox(height: 4),
-                      pw.Text(
-                        _invoiceNumber,
-                        style: const pw.TextStyle(
-                          fontSize: 12,
-                          color: PdfColor.fromInt(0xFF6B7A6E),
-                        ),
-                      ),
-                    ],
-                  ),
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                    children: [
-                      pw.Text(
-                        _companyName,
-                        style: pw.TextStyle(
-                          fontSize: 14,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      pw.Text(_companyAddress1,
-                          style: const pw.TextStyle(
-                              fontSize: 10, color: PdfColor.fromInt(0xFF6B7A6E))),
-                      pw.Text(_companyAddress2,
-                          style: const pw.TextStyle(
-                              fontSize: 10, color: PdfColor.fromInt(0xFF6B7A6E))),
-                      pw.Text(_companyCountry,
-                          style: const pw.TextStyle(
-                              fontSize: 10, color: PdfColor.fromInt(0xFF6B7A6E))),
-                    ],
-                  ),
-                ],
-              ),
-              pw.SizedBox(height: 24),
-              // Bill To & Details
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'BILL TO',
-                        style: pw.TextStyle(
-                          fontSize: 9,
-                          fontWeight: pw.FontWeight.bold,
-                          color: const PdfColor.fromInt(0xFF9BA89E),
-                        ),
-                      ),
-                      pw.SizedBox(height: 4),
-                      pw.Text(_clientName,
-                          style: pw.TextStyle(
-                              fontSize: 12, fontWeight: pw.FontWeight.bold)),
-                      pw.Text(_clientCompany,
-                          style: const pw.TextStyle(fontSize: 10)),
-                      pw.Text(_clientStreet,
-                          style: const pw.TextStyle(fontSize: 10)),
-                      pw.Text(_clientCity,
-                          style: const pw.TextStyle(fontSize: 10)),
-                    ],
-                  ),
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                    children: [
-                      pw.Text(
-                        'DETAILS',
-                        style: pw.TextStyle(
-                          fontSize: 9,
-                          fontWeight: pw.FontWeight.bold,
-                          color: const PdfColor.fromInt(0xFF9BA89E),
-                        ),
-                      ),
-                      pw.SizedBox(height: 4),
-                      pw.Text('Date: $_issueDate',
-                          style: const pw.TextStyle(fontSize: 10)),
-                      pw.Text('Due: $_dueDate',
-                          style: const pw.TextStyle(fontSize: 10)),
-                    ],
-                  ),
-                ],
-              ),
-              pw.SizedBox(height: 24),
-              // Line Items Table
-              pw.Table(
-                border: const pw.TableBorder(
-                  bottom: pw.BorderSide(
-                      color: PdfColor.fromInt(0xFFE1E8E2), width: 1),
-                ),
-                children: [
-                  pw.TableRow(
-                    decoration: const pw.BoxDecoration(
-                      border: pw.Border(
-                        bottom: pw.BorderSide(
-                            color: PdfColor.fromInt(0xFFE1E8E2), width: 1),
-                      ),
-                    ),
-                    children: [
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.only(bottom: 8),
-                        child: pw.Text('DESCRIPTION',
-                            style: pw.TextStyle(
-                                fontSize: 9,
-                                fontWeight: pw.FontWeight.bold,
-                                color: const PdfColor.fromInt(0xFF9BA89E))),
-                      ),
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.only(bottom: 8),
-                        child: pw.Text('QTY',
-                            textAlign: pw.TextAlign.center,
-                            style: pw.TextStyle(
-                                fontSize: 9,
-                                fontWeight: pw.FontWeight.bold,
-                                color: const PdfColor.fromInt(0xFF9BA89E))),
-                      ),
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.only(bottom: 8),
-                        child: pw.Text('AMOUNT',
-                            textAlign: pw.TextAlign.right,
-                            style: pw.TextStyle(
-                                fontSize: 9,
-                                fontWeight: pw.FontWeight.bold,
-                                color: const PdfColor.fromInt(0xFF9BA89E))),
-                      ),
-                    ],
-                  ),
-                  ..._lineItems.map(
-                    (item) => pw.TableRow(
-                      children: [
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.symmetric(vertical: 8),
-                          child: pw.Text(item['description'] as String,
-                              style: const pw.TextStyle(fontSize: 10)),
-                        ),
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.symmetric(vertical: 8),
-                          child: pw.Text(item['qty'] as String,
-                              textAlign: pw.TextAlign.center,
-                              style: const pw.TextStyle(fontSize: 10)),
-                        ),
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.symmetric(vertical: 8),
-                          child: pw.Text(item['amount'] as String,
-                              textAlign: pw.TextAlign.right,
-                              style: pw.TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: pw.FontWeight.bold)),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              pw.SizedBox(height: 16),
-              // Totals
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.end,
-                children: [
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                    children: [
-                      pw.Row(
-                        children: [
-                          pw.Text('Subtotal  ',
-                              style: const pw.TextStyle(
-                                  fontSize: 10,
-                                  color: PdfColor.fromInt(0xFF6B7A6E))),
-                          pw.Text(_subtotal,
-                              style: const pw.TextStyle(fontSize: 10)),
-                        ],
-                      ),
-                      pw.SizedBox(height: 4),
-                      pw.Row(
-                        children: [
-                          pw.Text('Tax (0%)  ',
-                              style: const pw.TextStyle(
-                                  fontSize: 10,
-                                  color: PdfColor.fromInt(0xFF6B7A6E))),
-                          pw.Text(_tax,
-                              style: const pw.TextStyle(fontSize: 10)),
-                        ],
-                      ),
-                      pw.SizedBox(height: 6),
-                      pw.Row(
-                        children: [
-                          pw.Text('Total  ',
-                              style: pw.TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: pw.FontWeight.bold)),
-                          pw.Text(_total,
-                              style: pw.TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: pw.FontWeight.bold,
-                                  color:
-                                      const PdfColor.fromInt(0xFF2E5D31))),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              pw.Spacer(),
-              // Notes
-              pw.Text(
-                'NOTES & TERMS',
-                style: pw.TextStyle(
-                  fontSize: 8,
-                  fontWeight: pw.FontWeight.bold,
-                  color: const PdfColor.fromInt(0xFF9BA89E),
-                ),
-              ),
-              pw.SizedBox(height: 4),
-              pw.Text(
-                _notes,
-                style: const pw.TextStyle(
-                  fontSize: 9,
-                  color: PdfColor.fromInt(0xFF6B7A6E),
-                  fontStyle: pw.FontStyle.italic,
-                ),
-              ),
-              pw.SizedBox(height: 14),
-              pw.Center(
-                child: pw.Text(
-                  'VERIFIED CLIENTTRACK DOCUMENT',
-                  style: pw.TextStyle(
-                    fontSize: 8,
-                    fontWeight: pw.FontWeight.bold,
-                    color: const PdfColor.fromInt(0xFF2E5D31),
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-
-    return pdf.save();
-  }
-
   // ── Actions ────────────────────────────────────────────────────────────────
 
-  Future<void> _sharePdf() async {
+  Future<void> _sharePdf(InvoiceModel invoice, BusinessProfileModel? profile, bool isPro) async {
     HapticFeedback.lightImpact();
     setState(() => _isExporting = true);
     try {
-      final bytes = await _generatePdfBytes();
-      await Printing.sharePdf(
-        bytes: bytes,
-        filename: '$_invoiceNumber.pdf',
+      await ref.read(pdfInvoiceServiceProvider).shareInvoicePdf(
+        invoice: invoice,
+        profile: profile,
+        isPro: isPro,
       );
     } catch (e) {
       if (mounted) {
@@ -366,14 +55,14 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
     }
   }
 
-  Future<void> _downloadPdf() async {
+  Future<void> _downloadPdf(InvoiceModel invoice, BusinessProfileModel? profile, bool isPro) async {
     HapticFeedback.lightImpact();
     setState(() => _isExporting = true);
     try {
-      final bytes = await _generatePdfBytes();
-      await Printing.sharePdf(
-        bytes: bytes,
-        filename: '$_invoiceNumber.pdf',
+      await ref.read(pdfInvoiceServiceProvider).shareInvoicePdf(
+        invoice: invoice,
+        profile: profile,
+        isPro: isPro,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -394,11 +83,14 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
     }
   }
 
-  Future<void> _printDocument() async {
+  Future<void> _printDocument(InvoiceModel invoice, BusinessProfileModel? profile, bool isPro) async {
     HapticFeedback.lightImpact();
     try {
-      final bytes = await _generatePdfBytes();
-      await Printing.layoutPdf(onLayout: (_) => bytes);
+      await ref.read(pdfInvoiceServiceProvider).printInvoicePdf(
+        invoice: invoice,
+        profile: profile,
+        isPro: isPro,
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -408,15 +100,15 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
     }
   }
 
-  Future<void> _emailToClient() async {
+  Future<void> _emailToClient(InvoiceModel invoice, BusinessProfileModel? profile) async {
     HapticFeedback.lightImpact();
     final Uri emailLaunchUri = Uri(
       scheme: 'mailto',
-      path: _clientEmail,
+      path: invoice.clientEmail,
       queryParameters: {
-        'subject': 'Invoice $_invoiceNumber from ClientTrack',
+        'subject': 'Invoice #${invoice.invoiceNumber} from ClientTrack',
         'body':
-            'Hi $_clientName,\n\nPlease find attached invoice $_invoiceNumber for $_total due on $_dueDate.\n\nThank you,\nClientTrack',
+            'Hi ${invoice.clientName},\n\nPlease find attached invoice #${invoice.invoiceNumber} for ${profile?.currencySymbol ?? '\$'}${invoice.totalAmount.toStringAsFixed(2)} due on ${DateFormat('MMM dd, yyyy').format(invoice.dueDate)}.\n\nThank you,\nClientTrack',
       },
     );
 
@@ -426,7 +118,7 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Opening mail client for $_clientEmail...'),
+            content: Text('Opening mail client for ${invoice.clientEmail}...'),
             backgroundColor: AppColors.primaryForest,
           ),
         );
@@ -434,11 +126,11 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
     }
   }
 
-  void _copyPaymentLink() {
+  void _copyPaymentLink(InvoiceModel invoice) {
     HapticFeedback.mediumImpact();
     Clipboard.setData(
       ClipboardData(
-        text: 'https://pay.clienttrack.io/inv/${widget.invoiceId}',
+        text: 'https://pay.clienttrack.io/inv/${invoice.invoiceNumber}',
       ),
     );
     ScaffoldMessenger.of(context).showSnackBar(
@@ -450,7 +142,12 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
     );
   }
 
-  Future<void> _showMoreMenu(TapDownDetails details) async {
+  Future<void> _showMoreMenu(
+    TapDownDetails details,
+    InvoiceModel invoice,
+    BusinessProfileModel? profile,
+    bool isPro,
+  ) async {
     final RenderBox overlay =
         Overlay.of(context).context.findRenderObject() as RenderBox;
     final RelativeRect position = RelativeRect.fromRect(
@@ -498,19 +195,28 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
 
     if (value == null || !mounted) return;
     if (value == 'print') {
-      _printDocument();
+      _printDocument(invoice, profile, isPro);
     } else if (value == 'link') {
-      _copyPaymentLink();
+      _copyPaymentLink(invoice);
     } else if (value == 'email') {
-      _emailToClient();
+      _emailToClient(invoice, profile);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final invoiceAsync = ref.watch(invoiceByIdProvider(widget.invoiceId));
+    final invoice = invoiceAsync.asData?.value ??
+        kSeedInvoices.firstWhere(
+          (i) => i.id == widget.invoiceId,
+          orElse: () => kSeedInvoices.first,
+        );
+    final profile = ref.watch(businessProfileStreamProvider).asData?.value;
+    final isPro = ref.watch(isProProvider);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF8),
-      appBar: _buildAppBar(),
+      appBar: _buildAppBar(invoice, profile, isPro),
       body: Column(
         children: [
           Expanded(
@@ -520,19 +226,19 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildFinalReviewBanner(),
+                  _buildFinalReviewBanner(invoice),
                   const SizedBox(height: 16),
-                  _buildPaperDocumentSheet(),
+                  _buildPaperDocumentSheet(invoice, profile, isPro),
                   const SizedBox(height: 24),
                   _buildQuoteSection(),
                   const SizedBox(height: 24),
-                  _buildMoreActionsSection(),
+                  _buildMoreActionsSection(invoice, profile, isPro),
                   const SizedBox(height: 16),
                 ],
               ),
             ),
           ),
-          _buildBottomActionButtons(),
+          _buildBottomActionButtons(invoice, profile, isPro),
         ],
       ),
     );
@@ -540,7 +246,7 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
 
   // ── App Bar ────────────────────────────────────────────────────────────────
 
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(InvoiceModel invoice, BusinessProfileModel? profile, bool isPro) {
     return AppBar(
       backgroundColor: Colors.white,
       elevation: 0,
@@ -553,7 +259,7 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            _invoiceNumber,
+            'Invoice #${invoice.invoiceNumber}',
             style: const TextStyle(
               fontFamily: 'Inter',
               fontSize: 16,
@@ -574,10 +280,10 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
       actions: [
         IconButton(
           icon: const Icon(Icons.share_outlined, color: AppColors.textPrimary),
-          onPressed: _sharePdf,
+          onPressed: () => _sharePdf(invoice, profile, isPro),
         ),
         GestureDetector(
-          onTapDown: _showMoreMenu,
+          onTapDown: (details) => _showMoreMenu(details, invoice, profile, isPro),
           child: const Padding(
             padding: EdgeInsets.only(right: 16, left: 4),
             child: Icon(Icons.more_vert, color: AppColors.textPrimary),
@@ -593,7 +299,14 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
 
   // ── Final Review Banner ────────────────────────────────────────────────────
 
-  Widget _buildFinalReviewBanner() {
+  Widget _buildFinalReviewBanner(InvoiceModel invoice) {
+    final statusColor = invoice.status == InvoiceStatus.paid
+        ? const Color(0xFF0F9D7B)
+        : (invoice.isOverdue ? AppColors.overdueRed : AppColors.primaryForest);
+    final statusBg = invoice.status == InvoiceStatus.paid
+        ? const Color(0xFFE2F7F2)
+        : (invoice.isOverdue ? const Color(0xFFFEE2E2) : const Color(0xFFEBF6EE));
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -605,7 +318,7 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
               'Final Review',
               style: TextStyle(
                 fontFamily: 'Inter',
-                fontSize: 22,
+                fontSize: 20,
                 fontWeight: FontWeight.w800,
                 color: AppColors.textPrimary,
                 letterSpacing: -0.3,
@@ -622,20 +335,19 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
             ),
           ],
         ),
-        // DRAFT Status Pill
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
           decoration: BoxDecoration(
-            color: const Color(0xFFE2F7F2), // Light mint
+            color: statusBg,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Text(
-            _status,
-            style: const TextStyle(
+            invoice.status.label.toUpperCase(),
+            style: TextStyle(
               fontFamily: 'Inter',
               fontSize: 11,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF0F9D7B), // Teal mint
+              color: statusColor,
               letterSpacing: 0.5,
             ),
           ),
@@ -646,7 +358,14 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
 
   // ── Paper Document Sheet (Realistic PDF Card) ──────────────────────────────
 
-  Widget _buildPaperDocumentSheet() {
+  Widget _buildPaperDocumentSheet(InvoiceModel invoice, BusinessProfileModel? profile, bool isPro) {
+    final currency = profile?.currencySymbol.isNotEmpty == true ? profile!.currencySymbol : '\$';
+    final issueDateStr = DateFormat('MMM dd, yyyy').format(invoice.issueDate);
+    final dueDateStr = DateFormat('MMM dd, yyyy').format(invoice.dueDate);
+    final companyName = profile?.businessName.isNotEmpty == true
+        ? profile!.businessName
+        : (profile?.fullName.isNotEmpty == true ? profile!.fullName : 'Freelance Studio');
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -698,7 +417,7 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    _invoiceNumber,
+                    '#${invoice.invoiceNumber}',
                     style: const TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 11,
@@ -713,7 +432,7 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    _companyName,
+                    companyName,
                     style: const TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 13,
@@ -721,31 +440,37 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _companyAddress1,
-                    style: const TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 10,
-                      color: AppColors.textSecondary,
+                  if (profile?.address.isNotEmpty == true) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      profile!.address,
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 10,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
-                  ),
-                  Text(
-                    _companyAddress2,
-                    style: const TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 10,
-                      color: AppColors.textSecondary,
+                  ],
+                  if (profile?.email.isNotEmpty == true) ...[
+                    Text(
+                      profile!.email,
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 10,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
-                  ),
-                  Text(
-                    _companyCountry,
-                    style: const TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 10,
-                      color: AppColors.textSecondary,
+                  ],
+                  if (profile?.phone.isNotEmpty == true) ...[
+                    Text(
+                      profile!.phone,
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 10,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ],
@@ -772,7 +497,7 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _clientName,
+                    invoice.clientName,
                     style: const TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 13,
@@ -780,31 +505,27 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _clientCompany,
-                    style: const TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
+                  if (invoice.clientEmail.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      invoice.clientEmail,
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
-                  ),
-                  Text(
-                    _clientStreet,
-                    style: const TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
+                  ],
+                  if (invoice.clientPhone.isNotEmpty) ...[
+                    Text(
+                      invoice.clientPhone,
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
-                  ),
-                  Text(
-                    _clientCity,
-                    style: const TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
+                  ],
                 ],
               ),
               // Right: Details
@@ -833,7 +554,7 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
                         ),
                       ),
                       Text(
-                        _issueDate,
+                        issueDateStr,
                         style: const TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 11,
@@ -855,7 +576,7 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
                         ),
                       ),
                       Text(
-                        _dueDate,
+                        dueDateStr,
                         style: const TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 11,
@@ -925,59 +646,70 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
             ),
           ),
           // Line Items Rows
-          ..._lineItems.map(
-            (item) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 5,
-                    child: Text(
-                      item['description'] as String,
-                      style: const TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+          if (invoice.items.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 14),
+              child: Text(
+                'No line items specified.',
+                style: TextStyle(fontFamily: 'Inter', fontSize: 12, color: AppColors.textSecondary),
+              ),
+            )
+          else
+            ...invoice.items.map(
+              (item) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 5,
+                      child: Text(
+                        item.description.isNotEmpty ? item.description : 'Service item',
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                     ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      item['qty'] as String,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        item.quantity.toStringAsFixed(
+                          item.quantity.truncateToDouble() == item.quantity ? 0 : 2,
+                        ),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ),
-                  ),
-                  Expanded(
-                    flex: 3,
-                    child: Text(
-                      item['amount'] as String,
-                      textAlign: TextAlign.right,
-                      style: const TextStyle(
-                        fontFamily: 'Inter',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                    Expanded(
+                      flex: 3,
+                      child: Text(
+                        '$currency${item.amount.toStringAsFixed(2)}',
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
           const SizedBox(height: 12),
           // Totals block (right aligned)
           Align(
             alignment: Alignment.centerRight,
             child: SizedBox(
-              width: 180,
+              width: 190,
               child: Column(
                 children: [
                   Row(
@@ -992,7 +724,7 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
                         ),
                       ),
                       Text(
-                        _subtotal,
+                        '$currency${invoice.subtotal.toStringAsFixed(2)}',
                         style: const TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 12,
@@ -1002,29 +734,31 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Tax (0%)',
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
+                  if (invoice.taxAmount > 0 || invoice.taxRate > 0) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Tax (${invoice.taxRate.toStringAsFixed(0)}%)',
+                          style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
-                      ),
-                      Text(
-                        _tax,
-                        style: const TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+                        Text(
+                          '$currency${invoice.taxAmount.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 10),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1039,7 +773,7 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
                         ),
                       ),
                       Text(
-                        _total,
+                        '$currency${invoice.totalAmount.toStringAsFixed(2)}',
                         style: const TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 16,
@@ -1054,60 +788,56 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          const Divider(height: 1, color: AppColors.border),
-          const SizedBox(height: 14),
-          // Notes & Terms
-          const Text(
-            'NOTES & TERMS',
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 9,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.8,
-              color: AppColors.textTertiary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            _notes,
-            style: const TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 10,
-              fontStyle: FontStyle.italic,
-              height: 1.4,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 20),
-          // Verified Document Badge
-          Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          // Notes / Payment instructions footer
+          if (invoice.notes.isNotEmpty || profile?.bankDetails.isNotEmpty == true) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFE8F7F3),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFBBE9DC)),
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.border),
               ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.check_circle_outline_rounded,
-                    size: 14,
-                    color: Color(0xFF0F9D7B),
-                  ),
-                  SizedBox(width: 6),
-                  Text(
-                    'VERIFIED CLIENTTRACK DOCUMENT',
+                  const Text(
+                    'NOTES & INSTRUCTIONS',
                     style: TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 9,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0.6,
-                      color: Color(0xFF0F9D7B),
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    invoice.notes.isNotEmpty
+                        ? invoice.notes
+                        : (profile?.bankDetails ?? 'Thank you for your business.'),
+                    style: const TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                      height: 1.3,
                     ),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          Center(
+            child: Text(
+              isPro
+                  ? 'OFFICIAL INVOICE • ISSUED VIA CLIENTTRACK'
+                  : 'VERIFIED FREELANCER DOCUMENT • GENERATED VIA CLIENTTRACK',
+              style: const TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 8,
+                fontWeight: FontWeight.w800,
+                color: AppColors.primaryForest,
+                letterSpacing: 0.8,
               ),
             ),
           ),
@@ -1116,30 +846,55 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
     );
   }
 
-  // ── Inspirational Quote ────────────────────────────────────────────────────
+  // ── Quote / Tips Section ───────────────────────────────────────────────────
 
   Widget _buildQuoteSection() {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16),
-        child: Text(
-          '"Design is a formal response to a strategic question."',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 13,
-            fontStyle: FontStyle.italic,
-            color: AppColors.textSecondary,
-            height: 1.4,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFDCFCE7)),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.lightbulb_outline, color: AppColors.primaryForest, size: 20),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Freelancer Tip',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primaryForest,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Invoices sent within 24 hours of milestone completion get paid 42% faster on average.',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    color: Color(0xFF166534),
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 
   // ── More Actions Section ───────────────────────────────────────────────────
 
-  Widget _buildMoreActionsSection() {
+  Widget _buildMoreActionsSection(InvoiceModel invoice, BusinessProfileModel? profile, bool isPro) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1158,24 +913,24 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
         _buildActionCard(
           icon: Icons.mail_outline_rounded,
           title: 'Email to Client',
-          subtitle: _clientEmail,
-          onTap: _emailToClient,
+          subtitle: invoice.clientEmail.isNotEmpty ? invoice.clientEmail : 'Send via default email client',
+          onTap: () => _emailToClient(invoice, profile),
         ),
         const SizedBox(height: 10),
         // Action 2: Print Document
         _buildActionCard(
           icon: Icons.print_outlined,
           title: 'Print Document',
-          subtitle: 'Requires WiFi printer',
-          onTap: _printDocument,
+          subtitle: 'AirPrint / Google Cloud Print / Local printer',
+          onTap: () => _printDocument(invoice, profile, isPro),
         ),
         const SizedBox(height: 10),
         // Action 3: Copy Payment Link
         _buildActionCard(
           icon: Icons.open_in_new_rounded,
           title: 'Copy Payment Link',
-          subtitle: 'Stripe, PayPal, etc.',
-          onTap: _copyPaymentLink,
+          subtitle: 'Direct transfer or checkout link',
+          onTap: () => _copyPaymentLink(invoice),
         ),
       ],
     );
@@ -1247,7 +1002,7 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
 
   // ── Bottom Action Buttons ──────────────────────────────────────────────────
 
-  Widget _buildBottomActionButtons() {
+  Widget _buildBottomActionButtons(InvoiceModel invoice, BusinessProfileModel? profile, bool isPro) {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
       decoration: BoxDecoration(
@@ -1272,7 +1027,7 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
               child: SizedBox(
                 height: 48,
                 child: OutlinedButton(
-                  onPressed: _isExporting ? null : _downloadPdf,
+                  onPressed: _isExporting ? null : () => _downloadPdf(invoice, profile, isPro),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: AppColors.border),
                     shape: RoundedRectangleBorder(
@@ -1309,7 +1064,7 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
               child: SizedBox(
                 height: 48,
                 child: ElevatedButton(
-                  onPressed: _isExporting ? null : _sharePdf,
+                  onPressed: _isExporting ? null : () => _sharePdf(invoice, profile, isPro),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryForest,
                     foregroundColor: Colors.white,
@@ -1324,15 +1079,13 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         )
                       : const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.share_outlined,
-                                size: 19, color: Colors.white),
+                            Icon(Icons.share_outlined, size: 19, color: Colors.white),
                             SizedBox(width: 8),
                             Text(
                               'Share PDF',

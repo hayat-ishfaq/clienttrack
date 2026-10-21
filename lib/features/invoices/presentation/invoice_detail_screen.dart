@@ -8,7 +8,10 @@ import '../../../app/router/route_names.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../chaser/data/reminder_repository.dart';
 import '../../chaser/domain/models/reminder_log_model.dart';
+import '../../paywall/data/revenue_cat_service.dart';
+import '../../settings/data/business_profile_repository.dart';
 import '../data/invoice_repository.dart';
+import '../data/pdf_invoice_service.dart';
 import '../domain/models/invoice_model.dart';
 
 // ---------------------------------------------------------------------------
@@ -272,12 +275,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                 child: ElevatedButton(
                   onPressed: () {
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('PRO subscription activated for demo!'),
-                        backgroundColor: AppColors.primaryForest,
-                      ),
-                    );
+                    context.pushNamed(AppRoutes.paywallName);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryForest,
@@ -343,7 +341,17 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
             children: [
               Icon(Icons.download_outlined, size: 20, color: AppColors.textPrimary),
               SizedBox(width: 12),
-              Text('Download PDF', style: TextStyle(fontFamily: 'Inter', fontSize: 14)),
+              Text('Preview / Download PDF', style: TextStyle(fontFamily: 'Inter', fontSize: 14)),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'print',
+          child: Row(
+            children: [
+              Icon(Icons.print_outlined, size: 20, color: AppColors.textPrimary),
+              SizedBox(width: 12),
+              Text('Print PDF', style: TextStyle(fontFamily: 'Inter', fontSize: 14)),
             ],
           ),
         ),
@@ -377,6 +385,17 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
         AppRoutes.pdfPreviewName,
         pathParameters: {'id': widget.invoiceId},
       );
+    } else if (value == 'print') {
+      final invoice = ref.read(invoiceByIdProvider(widget.invoiceId)).asData?.value;
+      if (invoice != null) {
+        final profile = ref.read(businessProfileStreamProvider).asData?.value;
+        final isPro = ref.read(isProProvider);
+        await ref.read(pdfInvoiceServiceProvider).printInvoicePdf(
+          invoice: invoice,
+          profile: profile,
+          isPro: isPro,
+        );
+      }
     } else if (value == 'delete') {
       final invoice = ref.read(invoiceByIdProvider(widget.invoiceId)).asData?.value;
       if (invoice != null) {

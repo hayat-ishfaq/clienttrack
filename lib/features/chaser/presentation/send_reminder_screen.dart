@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -162,33 +164,69 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
     await _logReminderSent(invoice, 'whatsapp');
     final cleanPhone = invoice.clientPhone.replaceAll(RegExp(r'[^0-9]'), '');
     final encodedText = Uri.encodeComponent(_messageController.text);
-    final url = Uri.parse('https://wa.me/$cleanPhone?text=$encodedText');
 
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    } else {
-      _shareNative(invoice);
+    final appUri = Uri.parse('whatsapp://send?phone=$cleanPhone&text=$encodedText');
+    final webUri = Uri.parse('https://wa.me/$cleanPhone?text=$encodedText');
+
+    bool launched = false;
+    try {
+      if (await canLaunchUrl(appUri)) {
+        launched = await launchUrl(appUri, mode: LaunchMode.externalApplication);
+      } else if (await canLaunchUrl(webUri)) {
+        launched = await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {
+      launched = false;
+    }
+
+    if (!launched) {
+      await _shareNative(invoice);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Opening WhatsApp... reminder logged!'),
+          backgroundColor: AppColors.primaryForest,
+          duration: Duration(seconds: 2),
+        ),
+      );
     }
   }
 
   Future<void> _shareViaSms(InvoiceModel invoice) async {
     HapticFeedback.lightImpact();
     await _logReminderSent(invoice, 'sms');
-    final cleanPhone = invoice.clientPhone.replaceAll(RegExp(r'[^0-9]'), '');
+    final cleanPhone = invoice.clientPhone.replaceAll(RegExp(r'[^0-9+]'), '');
     final encodedText = Uri.encodeComponent(_messageController.text);
-    final url = Uri.parse('sms:$cleanPhone?body=$encodedText');
 
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url);
-    } else {
-      _shareNative(invoice);
+    final separator = (!kIsWeb && Platform.isIOS) ? '&' : '?';
+    final smsUri = Uri.parse('sms:$cleanPhone${separator}body=$encodedText');
+
+    bool launched = false;
+    try {
+      if (await canLaunchUrl(smsUri)) {
+        launched = await launchUrl(smsUri);
+      }
+    } catch (_) {
+      launched = false;
+    }
+
+    if (!launched) {
+      await _shareNative(invoice);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Opening Messages... reminder logged!'),
+          backgroundColor: AppColors.primaryForest,
+          duration: Duration(seconds: 2),
+        ),
+      );
     }
   }
 
   Future<void> _shareViaMail(InvoiceModel invoice) async {
     HapticFeedback.lightImpact();
     await _logReminderSent(invoice, 'email');
-    final url = Uri(
+    final mailUri = Uri(
       scheme: 'mailto',
       path: invoice.clientEmail,
       queryParameters: {
@@ -197,10 +235,25 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
       },
     );
 
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url);
-    } else {
-      _shareNative(invoice);
+    bool launched = false;
+    try {
+      if (await canLaunchUrl(mailUri)) {
+        launched = await launchUrl(mailUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {
+      launched = false;
+    }
+
+    if (!launched) {
+      await _shareNative(invoice);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Opening Email client... reminder logged!'),
+          backgroundColor: AppColors.primaryForest,
+          duration: Duration(seconds: 2),
+        ),
+      );
     }
   }
 
