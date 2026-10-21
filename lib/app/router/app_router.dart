@@ -23,6 +23,7 @@ import '../../features/invoices/presentation/invoice_detail_screen.dart';
 import '../../features/invoices/presentation/pdf_preview_screen.dart';
 import '../../features/invoices/presentation/invoices_screen.dart';
 import '../../features/chaser/presentation/needs_follow_up_screen.dart';
+import '../../features/chaser/presentation/send_reminder_screen.dart';
 import '../../features/settings/presentation/business_profile_screen.dart';
 import '../../features/paywall/presentation/paywall_screen.dart';
 
@@ -212,10 +213,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.reminderComposer,
         name: AppRoutes.reminderComposerName,
-        builder: (context, state) => PlaceholderScreen(
-          title: 'Reminder Composer',
-          subtitle: 'Compose reminder for invoice: ${state.pathParameters['id']}',
-          icon: Icons.outgoing_mail,
+        builder: (context, state) => SendReminderScreen(
+          invoiceId: state.pathParameters['id'] ?? '1023',
         ),
       ),
 
