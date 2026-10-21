@@ -136,7 +136,16 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen>
                   ),
 
                   // Client cards
-                  if (filtered.isEmpty)
+                  if (clientsAsync.isLoading && allClients.isEmpty)
+                    const SliverToBoxAdapter(
+                      child: Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(48),
+                          child: CircularProgressIndicator(color: AppColors.primaryForest),
+                        ),
+                      ),
+                    )
+                  else if (filtered.isEmpty)
                     SliverToBoxAdapter(child: _buildEmptyState())
                   else
                     SliverList(

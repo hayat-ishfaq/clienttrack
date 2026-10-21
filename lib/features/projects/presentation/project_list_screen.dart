@@ -128,7 +128,16 @@ class _ProjectListScreenState extends ConsumerState<ProjectListScreen> {
                   ),
 
                   // Project cards
-                  if (results.isEmpty)
+                  if (projectsAsync.isLoading && allProjects.isEmpty)
+                    const SliverToBoxAdapter(
+                      child: Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(48),
+                          child: CircularProgressIndicator(color: AppColors.primaryForest),
+                        ),
+                      ),
+                    )
+                  else if (results.isEmpty)
                     SliverToBoxAdapter(child: _buildEmptyState())
                   else
                     SliverList(

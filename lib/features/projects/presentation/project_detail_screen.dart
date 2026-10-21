@@ -4,10 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/router/route_names.dart';
 import '../../../app/theme/app_colors.dart';
-import '../../invoices/data/invoice_repository.dart';
 import '../../invoices/domain/models/invoice_model.dart';
 import '../data/project_repository.dart';
 import '../domain/models/project_model.dart';
+import '../../../shared/providers/app_state_providers.dart';
 
 // ---------------------------------------------------------------------------
 // Screen: Project Details
@@ -181,9 +181,28 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     final project = projectAsync.asData?.value;
     _currentProject = project;
 
-    final invoicesAsync = ref.watch(clientInvoicesStreamProvider(project?.clientId ?? ''));
-    final invoices = invoicesAsync.asData?.value ?? [];
-    final linkedInvoice = invoices.isNotEmpty ? invoices.first : null;
+    if (projectAsync.isLoading && project == null) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+            onPressed: () => context.pop(),
+          ),
+          title: const Text('Project Details', style: TextStyle(color: AppColors.textPrimary)),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(color: AppColors.primaryForest),
+        ),
+      );
+    }
+
+    final financialSummary = ref.watch(projectFinancialSummaryProvider(widget.projectId));
+    final linkedInvoice = financialSummary.linkedInvoices.isNotEmpty
+        ? financialSummary.linkedInvoices.first
+        : null;
 
     final title = project?.title ?? 'Website Redesign';
     final status = project?.status.label.toUpperCase() ?? 'IN PROGRESS';
@@ -219,7 +238,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   _buildTwoColumnStatsRow(deadline, rateType, rateAmount),
                   const SizedBox(height: 24),
                   // Linked Invoices Section
-                  _buildLinkedInvoicesSection(linkedInvoice, invoices.length),
+                  _buildLinkedInvoicesSection(
+                      linkedInvoice, financialSummary.linkedInvoices.length),
                   const SizedBox(height: 20),
                   // Efficiency Insight Card
                   _buildEfficiencyInsightCard(),

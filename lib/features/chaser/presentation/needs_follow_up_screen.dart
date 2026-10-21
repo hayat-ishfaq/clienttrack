@@ -6,8 +6,8 @@ import 'package:intl/intl.dart';
 
 import '../../../app/router/route_names.dart';
 import '../../../app/theme/app_colors.dart';
-import '../../invoices/data/invoice_repository.dart';
 import '../../invoices/domain/models/invoice_model.dart';
+import '../../../shared/providers/app_state_providers.dart';
 
 // ---------------------------------------------------------------------------
 // Screen: Follow-up / Needs Follow-up
@@ -210,12 +210,8 @@ class _NeedsFollowUpScreenState extends ConsumerState<NeedsFollowUpScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final itemsAsync = ref.watch(needsFollowUpStreamProvider);
-    final allItems = itemsAsync.asData?.value ??
-        kSeedInvoices
-            .where((i) => i.isOverdue || i.status == InvoiceStatus.overdue)
-            .toList();
-    final filtered = _filterItems(allItems);
+    final summary = ref.watch(needsFollowUpSummaryProvider);
+    final filtered = _filterItems(summary.items);
     final totalOutstanding =
         filtered.fold(0.0, (sum, item) => sum + item.balanceDue);
 

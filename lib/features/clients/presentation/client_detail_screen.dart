@@ -14,6 +14,7 @@ import '../../projects/domain/models/project_model.dart';
 import '../../projects/data/project_repository.dart';
 import '../../invoices/domain/models/invoice_model.dart';
 import '../../invoices/data/invoice_repository.dart';
+import '../../../shared/providers/app_state_providers.dart';
 
 // ---------------------------------------------------------------------------
 // Screen 10: Client Detail
@@ -183,6 +184,26 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
   Widget build(BuildContext context) {
     final clientAsync = ref.watch(clientByIdProvider(widget.clientId));
     final client = clientAsync.asData?.value;
+
+    if (clientAsync.isLoading && client == null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8FAF9),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+            onPressed: () => context.pop(),
+          ),
+          title: const Text('Client Details', style: TextStyle(color: AppColors.textPrimary)),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(color: AppColors.primaryForest),
+        ),
+      );
+    }
+
+    final summary = ref.watch(clientPaymentSummaryProvider(widget.clientId));
     final projects = ref.watch(clientProjectsStreamProvider(widget.clientId)).asData?.value ?? [];
     final invoices = ref.watch(clientInvoicesStreamProvider(widget.clientId)).asData?.value ?? [];
 
@@ -192,10 +213,6 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
     final phone = client?.phone ?? '';
     final initials = client?.initials ?? 'CL';
     final presenceDot = client?.presenceDot ?? const Color(0xFF22C55E);
-
-    final billed = invoices.fold<double>(0.0, (s, i) => s + i.totalAmount);
-    final paid = invoices.fold<double>(0.0, (s, i) => s + i.amountPaid);
-    final outstanding = (billed - paid).clamp(0.0, double.infinity);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
@@ -219,13 +236,13 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
               const SizedBox(height: 20),
 
               // ── Financial summary ──────────────────────────────────────
-              _buildFinancialSummary(billed, paid, outstanding),
+              _buildFinancialSummary(summary.totalBilled, summary.totalPaid, summary.outstanding),
               const SizedBox(height: 20),
 
               // ── Payment history card ───────────────────────────────────
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _buildPaymentHistoryCard(invoices),
+                child: _buildPaymentHistoryCard(summary),
               ),
               const SizedBox(height: 20),
 
@@ -434,41 +451,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
 
   // ── Payment history card ────────────────────────────────────────────────────
 
-  Widget _buildPaymentHistoryCard(List<InvoiceModel> invoices) {
-    final hasInvoices = invoices.isNotEmpty;
-    final overdueCount = invoices.where((i) => i.isOverdue).length;
-    final onTimeCount = invoices.length - overdueCount;
-    final onTimePercent =
-        hasInvoices ? ((onTimeCount / invoices.length) * 100).round() : 100;
-
-    final totalOverdueDays = invoices
-        .where((i) => i.isOverdue)
-        .fold<int>(0, (s, i) => s + i.daysOverdue);
-    final avgDaysLate =
-        overdueCount > 0 ? (totalOverdueDays / overdueCount).round() : 0;
-
-    final chipLabel = !hasInvoices
-        ? 'No history'
-        : (onTimePercent >= 90
-            ? 'Usually pays on time'
-            : (onTimePercent >= 60 ? 'Sometimes late' : 'High risk'));
-
-    final chipBg = !hasInvoices
-        ? AppColors.draftGreyBg
-        : (onTimePercent >= 90
-            ? AppColors.paidTealBg
-            : (onTimePercent >= 60
-                ? AppColors.dueSoonAmberBg
-                : AppColors.overdueRedBg));
-
-    final chipFg = !hasInvoices
-        ? AppColors.draftGrey
-        : (onTimePercent >= 90
-            ? AppColors.paidTeal
-            : (onTimePercent >= 60
-                ? AppColors.dueSoonAmber
-                : AppColors.overdueRed));
-
+  Widget _buildPaymentHistoryCard(ClientReliabilitySummary summary) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -506,16 +489,16 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: chipBg,
+                  color: summary.tierBgColor,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  chipLabel,
+                  summary.tierLabel,
                   style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 11.5,
                     fontWeight: FontWeight.w600,
-                    color: chipFg,
+                    color: summary.tierFgColor,
                   ),
                 ),
               ),
@@ -541,7 +524,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '$avgDaysLate',
+                      '${summary.avgDaysLate}',
                       style: const TextStyle(
                         fontFamily: 'Inter',
                         fontSize: 32,
@@ -568,7 +551,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '$onTimePercent%',
+                      '${summary.onTimePercent}%',
                       style: const TextStyle(
                         fontFamily: 'Inter',
                         fontSize: 32,
@@ -591,7 +574,7 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Based on ${invoices.length} invoices',
+                'Based on ${summary.totalInvoices} invoices',
                 style: const TextStyle(
                   fontFamily: 'Inter',
                   fontSize: 12,

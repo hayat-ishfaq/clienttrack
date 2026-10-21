@@ -7,11 +7,10 @@ import 'package:intl/intl.dart';
 import '../../../app/router/route_names.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../auth/data/auth_repository.dart';
-import '../../invoices/data/invoice_repository.dart';
 import '../../invoices/domain/models/invoice_model.dart';
-import '../../projects/data/project_repository.dart';
 import '../../projects/domain/models/project_model.dart';
 import '../../settings/data/business_profile_repository.dart';
+import '../../../shared/providers/app_state_providers.dart';
 
 /// Screen 07: Main Dashboard Screen.
 /// Pixel-perfect implementation conforming to visily-07-dashboard.png.
@@ -205,23 +204,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final invoicesAsync = ref.watch(invoicesStreamProvider);
-    final projectsAsync = ref.watch(projectsStreamProvider);
+    final metrics = ref.watch(dashboardMetricsProvider);
     final profileAsync = ref.watch(businessProfileStreamProvider);
-
-    final invoices = invoicesAsync.asData?.value ?? kSeedInvoices;
-    final projects = projectsAsync.asData?.value ?? kSeedProjects;
     final profile = profileAsync.asData?.value;
 
     final userName = (profile != null && profile.fullName.trim().isNotEmpty)
         ? profile.fullName
         : _userName;
     final logoUrl = profile?.logoUrl;
-
-    final openInvoices = invoices.where((i) => i.status != InvoiceStatus.paid).toList();
-    final overdueInvoices = invoices.where((i) => i.isOverdue || i.status == InvoiceStatus.overdue).toList();
-    final totalBalance = invoices.fold<double>(0.0, (sum, i) => sum + i.balanceDue);
-    final activeProjects = projects.where((p) => p.status != ProjectStatus.completed).toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
@@ -234,33 +224,33 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 1. Top Header Bar (User Avatar, Greeting, Notification, More)
-              _buildTopHeader(context, userName, logoUrl, overdueInvoices.length),
+              _buildTopHeader(context, userName, logoUrl, metrics.overdueInvoicesCount),
               const SizedBox(height: 20),
 
               // 2. Weekly Balance Hero Card
-              _buildWeeklyBalanceCard(context, totalBalance),
+              _buildWeeklyBalanceCard(context, metrics.totalOutstanding),
               const SizedBox(height: 16),
 
               // 3. Metric Cards (Active Projects & Open Invoices)
               _buildMetricsRow(
                 context,
-                activeProjectsCount: activeProjects.length,
-                totalProjectsCount: projects.length,
-                openInvoicesCount: openInvoices.length,
-                overdueInvoicesCount: overdueInvoices.length,
+                activeProjectsCount: metrics.activeProjectsCount,
+                totalProjectsCount: metrics.totalProjectsCount,
+                openInvoicesCount: metrics.openInvoicesCount,
+                overdueInvoicesCount: metrics.overdueInvoicesCount,
               ),
               const SizedBox(height: 20),
 
               // 4. Needs Follow-up Alert Card
-              _buildNeedsFollowUpCard(context, overdueInvoices.length),
+              _buildNeedsFollowUpCard(context, metrics.overdueInvoicesCount),
               const SizedBox(height: 24),
 
               // 5. Deadlines Section
-              _buildDeadlinesSection(context, projects),
+              _buildDeadlinesSection(context, metrics.upcomingDeadlines),
               const SizedBox(height: 24),
 
               // 6. Recent Invoices Section
-              _buildRecentInvoicesSection(context, invoices),
+              _buildRecentInvoicesSection(context, metrics.recentInvoices),
               const SizedBox(height: 24),
 
               // 7. Quick Actions Section

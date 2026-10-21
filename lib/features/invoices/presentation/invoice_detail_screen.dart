@@ -426,6 +426,24 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final invoiceAsync = ref.watch(invoiceByIdProvider(widget.invoiceId));
+    if (invoiceAsync.isLoading && !invoiceAsync.hasValue) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+            onPressed: () => context.pop(),
+          ),
+          title: const Text('Invoice Details', style: TextStyle(color: AppColors.textPrimary)),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(color: AppColors.primaryForest),
+        ),
+      );
+    }
+
     final invoice = invoiceAsync.asData?.value ??
         kSeedInvoices.firstWhere(
           (i) => i.id == widget.invoiceId,

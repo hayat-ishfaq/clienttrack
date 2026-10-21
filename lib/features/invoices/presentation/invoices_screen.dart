@@ -8,6 +8,7 @@ import '../../../app/router/route_names.dart';
 import '../../../app/theme/app_colors.dart';
 import '../data/invoice_repository.dart';
 import '../domain/models/invoice_model.dart';
+import '../../../shared/providers/app_state_providers.dart';
 
 // ---------------------------------------------------------------------------
 // Filter for Invoices Screen
@@ -161,6 +162,7 @@ class _InvoicesScreenState extends ConsumerState<InvoicesScreen> {
   @override
   Widget build(BuildContext context) {
     final invoicesAsync = ref.watch(invoicesStreamProvider);
+    final summary = ref.watch(invoicesSummaryProvider);
     final allInvoices = invoicesAsync.asData?.value ?? kSeedInvoices;
     final filtered = _filterInvoices(allInvoices);
 
@@ -176,10 +178,10 @@ class _InvoicesScreenState extends ConsumerState<InvoicesScreen> {
             const SizedBox(height: 16),
           ],
           // Plan Usage Banner Card
-          _buildPlanUsageBanner(allInvoices.length),
+          _buildPlanUsageBanner(summary.totalCount),
           const SizedBox(height: 20),
           // Horizontal Filter Chips
-          _buildFilterChipsRow(),
+          _buildFilterChipsRow(summary),
           const SizedBox(height: 20),
           // Section Header: RECENT INVOICES + SORTED BY DATE
           _buildSectionHeader(),
@@ -415,13 +417,13 @@ class _InvoicesScreenState extends ConsumerState<InvoicesScreen> {
 
   // ── Filter Chips Row ───────────────────────────────────────────────────────
 
-  Widget _buildFilterChipsRow() {
+  Widget _buildFilterChipsRow(InvoicesScreenSummary summary) {
     final filters = [
-      {'label': 'All', 'status': InvoiceFilterStatus.all},
-      {'label': 'Draft', 'status': InvoiceFilterStatus.draft},
-      {'label': 'Sent', 'status': InvoiceFilterStatus.sent},
-      {'label': 'Overdue', 'status': InvoiceFilterStatus.overdue},
-      {'label': 'Paid', 'status': InvoiceFilterStatus.paid},
+      {'label': 'All (${summary.totalCount})', 'status': InvoiceFilterStatus.all},
+      {'label': 'Draft (${summary.draftCount})', 'status': InvoiceFilterStatus.draft},
+      {'label': 'Sent (${summary.sentCount})', 'status': InvoiceFilterStatus.sent},
+      {'label': 'Overdue (${summary.overdueCount})', 'status': InvoiceFilterStatus.overdue},
+      {'label': 'Paid (${summary.paidCount})', 'status': InvoiceFilterStatus.paid},
     ];
 
     return SingleChildScrollView(
