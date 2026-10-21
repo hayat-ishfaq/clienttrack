@@ -12,6 +12,7 @@ import '../../features/auth/presentation/signup_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/forgot_password_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screen.dart';
+import '../../features/clients/presentation/client_list_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final GlobalKey<NavigatorState> _homeNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'home');
@@ -87,11 +88,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: AppRoutes.clients,
                 name: AppRoutes.clientsName,
-                builder: (context, state) => const PlaceholderScreen(
-                  title: 'Clients',
-                  subtitle: 'Client directory and payment history ratings.',
-                  icon: Icons.people_outline_rounded,
-                ),
+                builder: (context, state) => const ClientListScreen(),
               ),
             ],
           ),
