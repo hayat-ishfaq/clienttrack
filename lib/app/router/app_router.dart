@@ -21,6 +21,7 @@ import '../../features/invoices/presentation/invoice_detail_screen.dart';
 import '../../features/invoices/presentation/pdf_preview_screen.dart';
 import '../../features/chaser/presentation/needs_follow_up_screen.dart';
 import '../../features/settings/presentation/business_profile_screen.dart';
+import '../../features/paywall/presentation/paywall_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final GlobalKey<NavigatorState> _homeNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'home');
@@ -232,11 +233,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.paywall,
         name: AppRoutes.paywallName,
-        builder: (context, state) => const PlaceholderScreen(
-          title: 'ClientTrack Pro',
-          subtitle: 'Unlock unlimited invoices, clients, and payment chasing.',
-          icon: Icons.auto_awesome,
-        ),
+        builder: (context, state) => const PaywallScreen(),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
