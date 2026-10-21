@@ -17,6 +17,7 @@ import '../../features/clients/presentation/add_edit_client_screen.dart';
 import '../../features/clients/presentation/client_detail_screen.dart';
 import '../../features/projects/presentation/project_list_screen.dart';
 import '../../features/invoices/presentation/create_invoice_screen.dart';
+import '../../features/invoices/presentation/invoice_detail_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final GlobalKey<NavigatorState> _homeNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'home');
@@ -192,10 +193,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.invoiceDetail,
         name: AppRoutes.invoiceDetailName,
-        builder: (context, state) => PlaceholderScreen(
-          title: 'Invoice Details',
-          subtitle: 'Invoice: ${state.pathParameters['id']}',
-          icon: Icons.receipt_outlined,
+        builder: (context, state) => InvoiceDetailScreen(
+          invoiceId: state.pathParameters['id'] ?? '1023',
         ),
       ),
       GoRoute(
