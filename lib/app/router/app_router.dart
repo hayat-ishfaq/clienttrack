@@ -19,6 +19,7 @@ import '../../features/projects/presentation/project_list_screen.dart';
 import '../../features/invoices/presentation/create_invoice_screen.dart';
 import '../../features/invoices/presentation/invoice_detail_screen.dart';
 import '../../features/invoices/presentation/pdf_preview_screen.dart';
+import '../../features/chaser/presentation/needs_follow_up_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final GlobalKey<NavigatorState> _homeNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'home');
@@ -212,11 +213,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.needsFollowUp,
         name: AppRoutes.needsFollowUpName,
-        builder: (context, state) => const PlaceholderScreen(
-          title: 'Needs Follow-up',
-          subtitle: 'Overdue and due-today invoices requiring attention.',
-          icon: Icons.notification_important_outlined,
-        ),
+        builder: (context, state) => const NeedsFollowUpScreen(),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
