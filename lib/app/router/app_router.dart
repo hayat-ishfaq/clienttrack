@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import 'route_names.dart';
 import '../../shared/widgets/navigation/main_scaffold_shell.dart';
-import '../../shared/widgets/navigation/placeholder_screen.dart';
 import '../../features/onboarding/presentation/splash_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/onboarding/presentation/profile_setup_screen.dart';
@@ -25,6 +24,7 @@ import '../../features/invoices/presentation/invoices_screen.dart';
 import '../../features/chaser/presentation/needs_follow_up_screen.dart';
 import '../../features/chaser/presentation/send_reminder_screen.dart';
 import '../../features/settings/presentation/business_profile_screen.dart';
+import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/paywall/presentation/paywall_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -235,11 +235,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.settings,
         name: AppRoutes.settingsName,
-        builder: (context, state) => const PlaceholderScreen(
-          title: 'Settings',
-          subtitle: 'Subscription, business profile, and preferences.',
-          icon: Icons.settings_outlined,
-        ),
+        builder: (context, state) => const SettingsScreen(),
       ),
     ],
   );
