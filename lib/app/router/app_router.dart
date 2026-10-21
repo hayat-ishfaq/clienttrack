@@ -13,6 +13,7 @@ import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/forgot_password_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/clients/presentation/client_list_screen.dart';
+import '../../features/clients/presentation/add_edit_client_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final GlobalKey<NavigatorState> _homeNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'home');
@@ -130,11 +131,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.addClient,
         name: AppRoutes.addClientName,
-        builder: (context, state) => const PlaceholderScreen(
-          title: 'Add Client',
-          subtitle: 'Create a new client profile.',
-          icon: Icons.person_add_alt_1_outlined,
-        ),
+        builder: (context, state) => const AddEditClientScreen(),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
@@ -150,10 +147,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.editClient,
         name: AppRoutes.editClientName,
-        builder: (context, state) => PlaceholderScreen(
-          title: 'Edit Client',
-          subtitle: 'Edit client: ${state.pathParameters['id']}',
-          icon: Icons.edit_outlined,
+        builder: (context, state) => AddEditClientScreen(
+          clientId: state.pathParameters['id'],
         ),
       ),
 
