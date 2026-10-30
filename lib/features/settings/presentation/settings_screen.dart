@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -198,6 +199,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  // ── FT-023: Compliant Account Deletion & Data Purge ───────────────────────
+  //
+  // Apple App Store Review Guideline 5.1.1(v) compliance:
+  //   1. Double confirmation modal warning user that data cannot be recovered.
+  //   2. Password re-authentication before destructive action.
+  //   3. Recursive purge of all Firestore subcollections under /users/{uid}.
+  //   4. Cancel all scheduled local notifications.
+  //   5. Delete Firebase Auth user.
+  //   6. Navigate to Login screen.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Step 1: Show the first confirmation dialog.
   void _confirmDeleteAccount() {
     showDialog(
       context: context,
@@ -208,9 +221,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700),
         ),
         content: const Text(
-          'This will permanently delete your account, business profile, all client records, and invoice history. This action cannot be undone.',
+          'This will permanently delete your account, business profile, all '
+          'clients, projects, invoices, and reminder history.\n\n'
+          'This action is irreversible. If you have an active subscription, '
+          'please cancel it in your device\'s Settings app first.',
           style: TextStyle(
-              fontFamily: 'Inter', color: AppColors.textSecondary, height: 1.4),
+              fontFamily: 'Inter', color: AppColors.textSecondary, height: 1.5),
         ),
         actions: [
           TextButton(
@@ -219,22 +235,217 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 style: TextStyle(color: AppColors.textSecondary)),
           ),
           TextButton(
-            onPressed: () async {
+            onPressed: () {
               Navigator.pop(ctx);
-              try {
-                await FirebaseAuth.instance.signOut();
-              } catch (_) {}
-              if (mounted) {
-                context.go(AppRoutes.login);
-              }
+              _showReauthDialog();
             },
-            child: const Text('Delete permanently',
-                style: TextStyle(
-                    color: AppColors.overdueRed, fontWeight: FontWeight.w700)),
+            child: const Text(
+              'Delete my account',
+              style: TextStyle(
+                  color: AppColors.overdueRed, fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),
     );
+  }
+
+  /// Step 2: Re-authenticate with password before purge.
+  void _showReauthDialog() {
+    final passwordCtrl = TextEditingController();
+    bool isDeleting = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text(
+            'Confirm Identity',
+            style:
+                TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Enter your password to permanently delete your account and all data.',
+                style: TextStyle(
+                    fontFamily: 'Inter',
+                    color: AppColors.textSecondary,
+                    height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: passwordCtrl,
+                obscureText: true,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'Password',
+                  hintStyle: const TextStyle(
+                      fontFamily: 'Inter', color: AppColors.textTertiary),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide:
+                        const BorderSide(color: AppColors.primaryForest),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 12),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed:
+                  isDeleting ? null : () => Navigator.pop(ctx),
+              child: const Text('Cancel',
+                  style: TextStyle(color: AppColors.textSecondary)),
+            ),
+            TextButton(
+              onPressed: isDeleting
+                  ? null
+                  : () async {
+                      final password = passwordCtrl.text.trim();
+                      if (password.isEmpty) return;
+
+                      setDialogState(() => isDeleting = true);
+
+                      final errorMsg = await _deleteAccountAndPurgeData(
+                          password, ctx);
+
+                      if (!mounted) return;
+
+                      if (errorMsg != null) {
+                        setDialogState(() => isDeleting = false);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(errorMsg,
+                                style:
+                                    const TextStyle(fontFamily: 'Inter')),
+                            backgroundColor: AppColors.overdueRed,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            margin: const EdgeInsets.all(16),
+                          ),
+                        );
+                      }
+                      // On success the dialog has been popped and we've
+                      // navigated to login — nothing more to do.
+                    },
+              child: isDeleting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.overdueRed),
+                    )
+                  : const Text(
+                      'Delete permanently',
+                      style: TextStyle(
+                          color: AppColors.overdueRed,
+                          fontWeight: FontWeight.w700),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Step 3: Re-auth → Purge Firestore → Cancel notifications → Delete auth user.
+  /// Returns null on success, or an error message string on failure.
+  Future<String?> _deleteAccountAndPurgeData(
+      String password, BuildContext dialogCtx) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return 'No signed-in user found.';
+    if (user.email == null) return 'Cannot re-authenticate: no email on file.';
+
+    // ── 1. Re-authenticate ─────────────────────────────────────────────────
+    try {
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: password,
+      );
+      await user.reauthenticateWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      switch (e.code) {
+        case 'wrong-password':
+        case 'invalid-credential':
+          return 'Incorrect password. Please try again.';
+        case 'too-many-requests':
+          return 'Too many attempts. Please wait and try again.';
+        default:
+          return 'Authentication failed: ${e.message}';
+      }
+    } catch (_) {
+      return 'Authentication failed. Please check your connection.';
+    }
+
+    // ── 2. Cancel all scheduled local notifications ────────────────────────
+    try {
+      await ref.read(notificationServiceProvider).cancelAllNotifications();
+    } catch (_) {}
+
+    // ── 3. Purge all Firestore subcollections under /users/{uid} ──────────
+    final firestore = FirebaseFirestore.instance;
+    final uid = user.uid;
+    final userDoc = firestore.collection('users').doc(uid);
+
+    try {
+      for (final sub in [
+        'clients',
+        'projects',
+        'invoices',
+        'reminder_logs',
+        'profile',
+      ]) {
+        await _deleteCollection(userDoc.collection(sub));
+      }
+      // Delete the root user document itself
+      await userDoc.delete();
+    } catch (e) {
+      return 'Failed to purge data. Please check your connection and try again.';
+    }
+
+    // ── 4. Delete Firebase Auth user ──────────────────────────────────────
+    try {
+      await user.delete();
+    } on FirebaseAuthException catch (e) {
+      return 'Account data purged but could not delete auth user: ${e.message}';
+    }
+
+    // ── 5. Navigate to login ───────────────────────────────────────────────
+    if (dialogCtx.mounted) Navigator.pop(dialogCtx);
+    if (mounted) {
+      HapticFeedback.heavyImpact();
+      context.go(AppRoutes.login);
+    }
+    return null; // success
+  }
+
+  /// Recursively deletes all documents in a Firestore collection in batches.
+  Future<void> _deleteCollection(CollectionReference col) async {
+    const batchSize = 100;
+    QuerySnapshot snapshot;
+    do {
+      snapshot = await col.limit(batchSize).get();
+      if (snapshot.docs.isEmpty) break;
+      final batch = col.firestore.batch();
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    } while (snapshot.docs.length == batchSize);
   }
 
   @override

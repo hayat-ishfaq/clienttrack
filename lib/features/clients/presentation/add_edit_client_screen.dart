@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../app/router/route_names.dart';
 import '../../../app/theme/app_colors.dart';
+import '../../../core/services/feature_gate_service.dart';
 import '../../../shared/widgets/buttons/primary_button.dart';
 import '../../../shared/widgets/buttons/secondary_button.dart';
 import '../domain/models/client_model.dart';
@@ -81,6 +84,35 @@ class _AddEditClientScreenState extends ConsumerState<AddEditClientScreen> {
   Future<void> _onSave() async {
     FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
+
+    // ── FT-019: Feature gate — free-tier client limit check ────────────────
+    if (!widget.isEditing) {
+      final gate = ref.read(featureGateServiceProvider);
+      final result = gate.checkCanAddClient();
+      if (!result.allowed) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.blockedReason,
+                style: const TextStyle(fontFamily: 'Inter')),
+            backgroundColor: AppColors.overdueRed,
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            margin: const EdgeInsets.all(16),
+            duration: const Duration(seconds: 3),
+            action: SnackBarAction(
+              label: 'Upgrade',
+              textColor: Colors.white,
+              onPressed: () => context.push(AppRoutes.paywall),
+            ),
+          ),
+        );
+        context.push(AppRoutes.paywall);
+        return;
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     setState(() => _isSaving = true);
     try {

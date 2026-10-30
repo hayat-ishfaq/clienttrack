@@ -442,6 +442,16 @@ class NotificationService {
     } catch (_) {}
   }
 
+  /// Cancels ALL pending and delivered notifications.
+  /// Called during account deletion to clear the notification tray and
+  /// pending alarm queue before the user data is purged.
+  Future<void> cancelAllNotifications() async {
+    if (kIsWeb || !_isInitialized) return;
+    try {
+      await _notificationsPlugin.cancelAll();
+    } catch (_) {}
+  }
+
   /// Internal helper to invoke `zonedSchedule` with error-tolerance.
   Future<void> _zonedSchedule({
     required int id,

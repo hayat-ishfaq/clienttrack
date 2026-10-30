@@ -25,7 +25,7 @@
 
 ## Overall Progress Summary
 
-$$\mathbf{81.5\% \text{ Complete (P0 Scope: 22 / 27 Tickets Completed)}}$$
+$$\mathbf{88.9\% \text{ Complete (P0 Scope: 24 / 27 Tickets Completed)}}$$
 
 | Phase | Phase Name | Status | % Complete | Done / Total |
 | :---: | :--- | :---: | :---: | :---: |
@@ -34,17 +34,17 @@ $$\mathbf{81.5\% \text{ Complete (P0 Scope: 22 / 27 Tickets Completed)}}$$
 | **Phase 2** | Payment Chaser Engine | Completed | 100% | 3 / 3 (P0) |
 | **Phase 3** | Dashboard Cockpit | Completed | 100% | 1 / 1 (P0) |
 | **Phase 4** | Local Notifications | Completed | 100% | 2 / 2 (P0) |
-| **Phase 5** | Monetization & RevenueCat | In Progress | 50.0% | 2 / 4 (P0) |
-| **Phase 6** | Release Readiness & Store | In Progress | 50.0% | 3 / 6 (P0) |
+| **Phase 5** | Monetization & RevenueCat | In Progress | 75.0% | 3 / 4 (P0) |
+| **Phase 6** | Release Readiness & Store | In Progress | 66.7% | 4 / 6 (P0) |
 | **Phase 7** | Post-P0 / Time-Permitting | Deferred | 0% | 0 / 10 (P1/P2) |
-| **TOTAL** | | | **59.5%** | **22 / 37** |
+| **TOTAL** | | | **64.9%** | **24 / 37** |
 
 ---
 
 ## Active Status
 
-- **Currently Working On**: Phase 4 Local Notifications (FT-016 & FT-017) completed with permission orchestrator, educational prompt, and automated invoice/project deadline scheduling.
-- **Next Up**: FT-019 (Feature Gating Service & Limit Enforcement), FT-023 (In-App Account Deletion & Data Purge).
+- **Currently Working On**: FT-019 (Feature Gating Service & Limit Enforcement) and FT-023 (In-App Account Deletion & Data Purge) completed.
+- **Next Up**: FT-021 (Sandbox Testing Matrix Execution), FT-026 (Store Metadata, Privacy Policy & Submission Assets), FT-027 (Demonstration Video Production).
 - **Blockers**: None.
 
 ---
@@ -80,13 +80,13 @@ $$\mathbf{81.5\% \text{ Complete (P0 Scope: 22 / 27 Tickets Completed)}}$$
 
 ### Phase 5: RevenueCat Monetization & Paywall
 - [x] **FT-018**: RevenueCat SDK Integration & User Identity (P0)
-- [ ] **FT-019**: Feature Gating Service & Limit Enforcement (P0)
+- [x] **FT-019**: Feature Gating Service & Limit Enforcement (P0)
 - [x] **FT-020**: Paywall Modal & Subscription Purchase Flow (P0)
 - [ ] **FT-021**: Sandbox Testing Matrix Execution (P0)
 
 ### Phase 6: Release Readiness & Store Compliance
 - [x] **FT-022**: Empty, Loading, and Error States (P0)
-- [ ] **FT-023**: In-App Account Deletion & Data Purge (P0)
+- [x] **FT-023**: In-App Account Deletion & Data Purge (P0)
 - [x] **FT-024**: Demo / Seed Data Generator (P0)
 - [x] **FT-025**: Settings Screen & Business Profile Editor (P0)
 - [ ] **FT-026**: Store Metadata, Privacy Policy & Submission Assets (P0)
@@ -184,6 +184,11 @@ $$\mathbf{81.5\% \text{ Complete (P0 Scope: 22 / 27 Tickets Completed)}}$$
   4. Built notification scheduling engine queuing alerts for upcoming invoice due dates (Due - 2 days at 9 AM, Due Day at 9 AM, Due + 1 day overdue alert at 10 AM) and project deadlines, with pruning engine maintaining $\le 40$ active alerts (iOS 64 limit).
   5. Wired notification service to `create_invoice_screen.dart`, `invoice_detail_screen.dart` (cancel/schedule on paid toggle), `new_project_screen.dart`, and added notification triggers/test alerts to `settings_screen.dart`.
   6. Synchronized `docs/Progress.md` living checklist: Phase 1 (100%), Phase 2 (100%), Phase 3 (100%), and Phase 4 (100%) completed; overall P0 scope advanced to 81.5% (22/27 tickets). 0 analyzer issues verified.
+- **2026-10-30**: FT-019 (Feature Gating Service & Limit Enforcement) & FT-023 (Compliant Account Deletion & Data Purge) Completed:
+  1. Created `FeatureGateService` in `lib/core/services/feature_gate_service.dart` enforcing free-tier caps: max 3 clients, max 5 invoices, and max 3 lifetime reminder shares, with instantaneous Pro bypass.
+  2. Wired feature gate checks into `add_edit_client_screen.dart` (blocking on 4th client attempt), `create_invoice_screen.dart` (blocking on 6th invoice attempt), and `send_reminder_screen.dart` (blocking on 4th lifetime reminder share across WhatsApp, SMS, Email, and Native Share sheet), automatically surfacing contextual upgrade snackbars and routing to `/paywall`.
+  3. Implemented full Apple App Store Guideline 5.1.1(v) compliant account deletion flow in `settings_screen.dart`: two-step irreversible deletion alert, password re-authentication dialog, recursive batch deletion of all user subcollections (`clients`, `projects`, `invoices`, `reminder_logs`, `profile`) and the root user doc, cancellation of all scheduled local notifications via `NotificationService.cancelAllNotifications()`, Firebase Auth account deletion, and redirect to the login screen.
+  4. Updated master execution checklist: Overall P0 completion advanced to 88.9% (24 / 27 tickets).
 
 
 

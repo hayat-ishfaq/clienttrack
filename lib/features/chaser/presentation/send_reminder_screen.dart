@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/router/route_names.dart';
 import '../../../app/theme/app_colors.dart';
+import '../../../core/services/feature_gate_service.dart';
 import '../../invoices/data/invoice_repository.dart';
 import '../../invoices/domain/models/invoice_model.dart';
 import '../data/reminder_repository.dart';
@@ -148,7 +149,57 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
     } catch (_) {}
   }
 
+  /// Helper: shows a contextual upgrade snackbar.
+  void _showGateBlockedSnackbar(String reason) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content:
+            Text(reason, style: const TextStyle(fontFamily: 'Inter')),
+        backgroundColor: AppColors.overdueRed,
+        behavior: SnackBarBehavior.floating,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 3),
+        action: SnackBarAction(
+          label: 'Upgrade',
+          textColor: Colors.white,
+          onPressed: () => context.push(AppRoutes.paywall),
+        ),
+      ),
+    );
+  }
+
+  /// Helper: shows a contextual upgrade blocked snackbar.
+  void _showGateBlockedSnackbar(String reason) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(reason, style: const TextStyle(fontFamily: 'Inter')),
+        backgroundColor: AppColors.overdueRed,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 3),
+        action: SnackBarAction(
+          label: 'Upgrade',
+          textColor: Colors.white,
+          onPressed: () => context.push(AppRoutes.paywall),
+        ),
+      ),
+    );
+  }
+
   Future<void> _shareNative(InvoiceModel invoice) async {
+    // ── FT-019: Feature gate — free-tier reminder share limit ──────────────
+    final gate = ref.read(featureGateServiceProvider);
+    final gateResult = await gate.checkCanShareReminder();
+    if (!gateResult.allowed) {
+      if (!mounted) return;
+      _showGateBlockedSnackbar(gateResult.blockedReason);
+      context.push(AppRoutes.paywall);
+      return;
+    }
+    // ────────────────────────────────────────────────────────────────────────
     HapticFeedback.lightImpact();
     await _logReminderSent(invoice, 'native');
     await SharePlus.instance.share(
@@ -160,6 +211,16 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
   }
 
   Future<void> _shareViaWhatsApp(InvoiceModel invoice) async {
+    // ── FT-019: gate ────────────────────────────────────────────────────────
+    final gate = ref.read(featureGateServiceProvider);
+    final gateResult = await gate.checkCanShareReminder();
+    if (!gateResult.allowed) {
+      if (!mounted) return;
+      _showGateBlockedSnackbar(gateResult.blockedReason);
+      context.push(AppRoutes.paywall);
+      return;
+    }
+    // ────────────────────────────────────────────────────────────────────────
     HapticFeedback.lightImpact();
     await _logReminderSent(invoice, 'whatsapp');
     final cleanPhone = invoice.clientPhone.replaceAll(RegExp(r'[^0-9]'), '');
@@ -180,7 +241,12 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
     }
 
     if (!launched) {
-      await _shareNative(invoice);
+      await SharePlus.instance.share(
+        ShareParams(
+          text: _messageController.text,
+          subject: 'Payment Reminder for Invoice ${invoice.invoiceNumber}',
+        ),
+      );
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -193,6 +259,16 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
   }
 
   Future<void> _shareViaSms(InvoiceModel invoice) async {
+    // ── FT-019: gate ────────────────────────────────────────────────────────
+    final gate = ref.read(featureGateServiceProvider);
+    final gateResult = await gate.checkCanShareReminder();
+    if (!gateResult.allowed) {
+      if (!mounted) return;
+      _showGateBlockedSnackbar(gateResult.blockedReason);
+      context.push(AppRoutes.paywall);
+      return;
+    }
+    // ────────────────────────────────────────────────────────────────────────
     HapticFeedback.lightImpact();
     await _logReminderSent(invoice, 'sms');
     final cleanPhone = invoice.clientPhone.replaceAll(RegExp(r'[^0-9+]'), '');
@@ -211,7 +287,12 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
     }
 
     if (!launched) {
-      await _shareNative(invoice);
+      await SharePlus.instance.share(
+        ShareParams(
+          text: _messageController.text,
+          subject: 'Payment Reminder for Invoice ${invoice.invoiceNumber}',
+        ),
+      );
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -224,6 +305,16 @@ class _SendReminderScreenState extends ConsumerState<SendReminderScreen> {
   }
 
   Future<void> _shareViaMail(InvoiceModel invoice) async {
+    // ── FT-019: gate ────────────────────────────────────────────────────────
+    final gate = ref.read(featureGateServiceProvider);
+    final gateResult = await gate.checkCanShareReminder();
+    if (!gateResult.allowed) {
+      if (!mounted) return;
+      _showGateBlockedSnackbar(gateResult.blockedReason);
+      context.push(AppRoutes.paywall);
+      return;
+    }
+    // ────────────────────────────────────────────────────────────────────────
     HapticFeedback.lightImpact();
     await _logReminderSent(invoice, 'email');
     final mailUri = Uri(

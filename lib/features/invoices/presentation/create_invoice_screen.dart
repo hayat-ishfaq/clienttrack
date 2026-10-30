@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../app/router/route_names.dart';
 import '../../../app/theme/app_colors.dart';
+import '../../../core/services/feature_gate_service.dart';
 import '../../../shared/widgets/buttons/primary_button.dart';
 import '../../clients/data/client_repository.dart';
 import '../../clients/domain/models/client_model.dart';
@@ -330,6 +332,32 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
       );
       return;
     }
+
+    // ── FT-019: Feature gate — free-tier invoice limit check ───────────────
+    final gate = ref.read(featureGateServiceProvider);
+    final gateResult = gate.checkCanAddInvoice();
+    if (!gateResult.allowed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(gateResult.blockedReason,
+              style: const TextStyle(fontFamily: 'Inter')),
+          backgroundColor: AppColors.overdueRed,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 3),
+          action: SnackBarAction(
+            label: 'Upgrade',
+            textColor: Colors.white,
+            onPressed: () => context.push(AppRoutes.paywall),
+          ),
+        ),
+      );
+      context.push(AppRoutes.paywall);
+      return;
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     setState(() => _isGenerating = true);
     try {
