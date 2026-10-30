@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/router/route_names.dart';
 import '../../../app/theme/app_colors.dart';
+import '../../../core/services/notification_service.dart';
 
 // ---------------------------------------------------------------------------
 // Screen: Settings
@@ -252,6 +253,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 24),
           // Business & Billing Section
           _buildBusinessAndBillingSection(),
+          const SizedBox(height: 24),
+          // Notifications Section
+          _buildNotificationsSection(),
           const SizedBox(height: 24),
           // Legal Section
           _buildLegalSection(),
@@ -566,6 +570,86 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
                 onTap: _handleExportCsv,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Notifications & Alerts Section ─────────────────────────────────────────
+
+  Widget _buildNotificationsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'NOTIFICATIONS & ALERTS',
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.8,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            children: [
+              _buildListRow(
+                icon: Icons.notifications_active_outlined,
+                iconColor: AppColors.primaryForest,
+                title: 'Payment Chaser Reminders',
+                trailingBadge: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.paidTealBg,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'ACTIVE',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.paidTeal,
+                    ),
+                  ),
+                ),
+                onTap: () async {
+                  HapticFeedback.selectionClick();
+                  await ref.read(notificationServiceProvider).showNotificationPrePrompt(context);
+                },
+              ),
+              const Divider(height: 1, indent: 52, color: AppColors.border),
+              _buildListRow(
+                icon: Icons.send_time_extension_outlined,
+                iconColor: const Color(0xFF4A6FA5),
+                title: 'Send Test Alert',
+                onTap: () async {
+                  HapticFeedback.mediumImpact();
+                  await ref.read(notificationServiceProvider).showInstantTestNotification(
+                    title: 'ClientTrack Payment Reminder',
+                    body: 'Invoice #1024 for Acme Corp (\$1,250.00) is due soon.',
+                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Test notification dispatched! Check your notifications bar.'),
+                        backgroundColor: AppColors.primaryForest,
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                },
               ),
             ],
           ),

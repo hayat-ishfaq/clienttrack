@@ -19,32 +19,32 @@
 - **Primary Target OS**: Android & iOS (Flutter 3.13+)
 - **Monetization Engine**: RevenueCat SDK (`clienttrack_pro`)
 - **Hackathon Submission Deadline**: **[VERIFY]** (RevenueCat Hackathon submission window)
-- **Current Development Phase**: Phase 0 — Project Initialization
+- **Current Development Phase**: Phase 5 — Monetization & Phase 6 Store Readiness
 
 ---
 
 ## Overall Progress Summary
 
-$$\mathbf{18.5\% \text{ Complete (P0 Scope: 5 / 27 Tickets Completed)}}$$
+$$\mathbf{81.5\% \text{ Complete (P0 Scope: 22 / 27 Tickets Completed)}}$$
 
 | Phase | Phase Name | Status | % Complete | Done / Total |
 | :---: | :--- | :---: | :---: | :---: |
 | **Phase 0** | Project Setup & Architecture | Completed | 100% | 4 / 4 (P0) |
-| **Phase 1** | Core Product & Invoicing | In Progress | 14.3% | 1 / 7 (P0) |
-| **Phase 2** | Payment Chaser Engine | Pending | 0% | 0 / 3 (P0) |
-| **Phase 3** | Dashboard Cockpit | Pending | 0% | 0 / 1 (P0) |
-| **Phase 4** | Local Notifications | Pending | 0% | 0 / 2 (P0) |
-| **Phase 5** | Monetization & RevenueCat | Pending | 0% | 0 / 4 (P0) |
-| **Phase 6** | Release Readiness & Store | Pending | 0% | 0 / 6 (P0) |
+| **Phase 1** | Core Product & Invoicing | Completed | 100% | 7 / 7 (P0) |
+| **Phase 2** | Payment Chaser Engine | Completed | 100% | 3 / 3 (P0) |
+| **Phase 3** | Dashboard Cockpit | Completed | 100% | 1 / 1 (P0) |
+| **Phase 4** | Local Notifications | Completed | 100% | 2 / 2 (P0) |
+| **Phase 5** | Monetization & RevenueCat | In Progress | 50.0% | 2 / 4 (P0) |
+| **Phase 6** | Release Readiness & Store | In Progress | 50.0% | 3 / 6 (P0) |
 | **Phase 7** | Post-P0 / Time-Permitting | Deferred | 0% | 0 / 10 (P1/P2) |
-| **TOTAL** | | | **13.5%** | **5 / 37** |
+| **TOTAL** | | | **59.5%** | **22 / 37** |
 
 ---
 
 ## Active Status
 
-- **Currently Working On**: FT-005 (Authentication & Session Management) completed. Ready to proceed with FT-006 (Profile Setup & Business Onboarding).
-- **Next Up**: FT-006 (Profile Setup & Business Onboarding), FT-007 (Client Management CRUD).
+- **Currently Working On**: Phase 4 Local Notifications (FT-016 & FT-017) completed with permission orchestrator, educational prompt, and automated invoice/project deadline scheduling.
+- **Next Up**: FT-019 (Feature Gating Service & Limit Enforcement), FT-023 (In-App Account Deletion & Data Purge).
 - **Blockers**: None.
 
 ---
@@ -59,36 +59,36 @@ $$\mathbf{18.5\% \text{ Complete (P0 Scope: 5 / 27 Tickets Completed)}}$$
 
 ### Phase 1: Core Product & Data Pipelines
 - [x] **FT-005**: Authentication & Session Management (P0)
-- [ ] **FT-006**: Onboarding Carousel & Profile Setup (P0)
-- [ ] **FT-007**: Client Management (CRUD & Directory) (P0)
-- [ ] **FT-008**: Project Management (CRUD & Client Linking) (P0)
-- [ ] **FT-009**: Invoice Builder & Line Items Engine (P0)
-- [ ] **FT-010**: Invoice Detail & Mark as Paid Action (P0)
-- [ ] **FT-011**: On-Device PDF Invoice Generation & Share (P0)
+- [x] **FT-006**: Onboarding Carousel & Profile Setup (P0)
+- [x] **FT-007**: Client Management (CRUD & Directory) (P0)
+- [x] **FT-008**: Project Management (CRUD & Client Linking) (P0)
+- [x] **FT-009**: Invoice Builder & Line Items Engine (P0)
+- [x] **FT-010**: Invoice Detail & Mark as Paid Action (P0)
+- [x] **FT-011**: On-Device PDF Invoice Generation & Share (P0)
 
 ### Phase 2: Payment Chaser & Delivery Engine
-- [ ] **FT-012**: Deterministic Status Derivation & Payment History (P0)
-- [ ] **FT-013**: Needs Follow-up Screen (Chaser Cockpit) (P0)
-- [ ] **FT-014**: Reminder Template Engine & Native Dispatch (P0)
+- [x] **FT-012**: Deterministic Status Derivation & Payment History (P0)
+- [x] **FT-013**: Needs Follow-up Screen (Chaser Cockpit) (P0)
+- [x] **FT-014**: Reminder Template Engine & Native Dispatch (P0)
 
 ### Phase 3: Dashboard & Daily Cockpit
-- [ ] **FT-015**: Dashboard Financial Summaries & Action Cards (P0)
+- [x] **FT-015**: Dashboard Financial Summaries & Action Cards (P0)
 
 ### Phase 4: Local Notifications
-- [ ] **FT-016**: Local Notification Service & Permission Orchestrator (P0)
-- [ ] **FT-017**: Invoice & Project Deadline Notification Scheduling (P0)
+- [x] **FT-016**: Local Notification Service & Permission Orchestrator (P0)
+- [x] **FT-017**: Invoice & Project Deadline Notification Scheduling (P0)
 
 ### Phase 5: RevenueCat Monetization & Paywall
-- [ ] **FT-018**: RevenueCat SDK Integration & User Identity (P0)
+- [x] **FT-018**: RevenueCat SDK Integration & User Identity (P0)
 - [ ] **FT-019**: Feature Gating Service & Limit Enforcement (P0)
-- [ ] **FT-020**: Paywall Modal & Subscription Purchase Flow (P0)
+- [x] **FT-020**: Paywall Modal & Subscription Purchase Flow (P0)
 - [ ] **FT-021**: Sandbox Testing Matrix Execution (P0)
 
 ### Phase 6: Release Readiness & Store Compliance
-- [ ] **FT-022**: Empty, Loading, and Error States (P0)
+- [x] **FT-022**: Empty, Loading, and Error States (P0)
 - [ ] **FT-023**: In-App Account Deletion & Data Purge (P0)
-- [ ] **FT-024**: Demo / Seed Data Generator (P0)
-- [ ] **FT-025**: Settings Screen & Business Profile Editor (P0)
+- [x] **FT-024**: Demo / Seed Data Generator (P0)
+- [x] **FT-025**: Settings Screen & Business Profile Editor (P0)
 - [ ] **FT-026**: Store Metadata, Privacy Policy & Submission Assets (P0)
 - [ ] **FT-027**: Demonstration Video Production (P0)
 
@@ -151,9 +151,9 @@ $$\mathbf{18.5\% \text{ Complete (P0 Scope: 5 / 27 Tickets Completed)}}$$
 ## Target Project Milestones
 
 - **Milestone 1**: Phase 0 Architecture, Theme, and Navigation Shell complete. (Done: 2026-10-01)
-- **Milestone 2**: Phase 1 Core loop (Auth $\to$ Client $\to$ Project $\to$ Invoice $\to$ PDF) complete.
-- **Milestone 3**: Phase 2 Payment Chaser ("Needs Follow-up", templates, sharing) complete.
-- **Milestone 4**: Phase 3 Dashboard and Phase 4 Local Notifications complete.
+- **Milestone 2**: Phase 1 Core loop (Auth $\to$ Client $\to$ Project $\to$ Invoice $\to$ PDF) complete. (Done: 2026-10-21)
+- **Milestone 3**: Phase 2 Payment Chaser ("Needs Follow-up", templates, sharing) complete. (Done: 2026-10-21)
+- **Milestone 4**: Phase 3 Dashboard and Phase 4 Local Notifications complete. (Done: 2026-10-21)
 - **Milestone 5**: Phase 5 RevenueCat Monetization & Paywall functional in sandbox.
 - **Milestone 6**: Phase 6 Release prep, demo data, account deletion, and demo video completed.
 - **Milestone 7**: Store submission finalized.
@@ -177,5 +177,13 @@ $$\mathbf{18.5\% \text{ Complete (P0 Scope: 5 / 27 Tickets Completed)}}$$
   1. `url_launcher`: Direct WhatsApp deep-linking (`whatsapp://send` & `https://wa.me/`), SMS with platform query separator (`&` on iOS vs `?` on others), and Email (`mailto:`) with automatic fallback to native share sheet. Configured `AndroidManifest.xml` intent queries and `Info.plist` `LSApplicationQueriesSchemes`.
   2. RevenueCat (`purchases_flutter`): Created `RevenueCatService` with entitlement `clienttrack_pro`. Wired `PaywallScreen` with dynamic offerings retrieval, reactive pricing, purchase execution, restore purchases flow, and `isProProvider` subscription checking.
   3. Real PDF Byte Generation: Implemented `PdfInvoiceService` with `pdf` and `printing` packages. Connected `PdfPreviewScreen` and `InvoiceDetailScreen` to compile high-resolution PDF documents from Firestore invoice and business profile data with direct native sharing and printing. 0 analyzer issues.
+- **2026-10-21**: Phase 4 Local Notifications Implemented & Master Progress Audit:
+  1. Implemented `NotificationService` in `lib/core/services/notification_service.dart` (FT-016 & FT-017) with `flutter_local_notifications` and `timezone`.
+  2. Configured native channels (`clienttrack_invoices`, `clienttrack_projects`, `clienttrack_general`), exact alarm permissions in `AndroidManifest.xml`, and iOS Darwin notification setup.
+  3. Built educational pre-permission explainer bottom sheet and permission orchestrator.
+  4. Built notification scheduling engine queuing alerts for upcoming invoice due dates (Due - 2 days at 9 AM, Due Day at 9 AM, Due + 1 day overdue alert at 10 AM) and project deadlines, with pruning engine maintaining $\le 40$ active alerts (iOS 64 limit).
+  5. Wired notification service to `create_invoice_screen.dart`, `invoice_detail_screen.dart` (cancel/schedule on paid toggle), `new_project_screen.dart`, and added notification triggers/test alerts to `settings_screen.dart`.
+  6. Synchronized `docs/Progress.md` living checklist: Phase 1 (100%), Phase 2 (100%), Phase 3 (100%), and Phase 4 (100%) completed; overall P0 scope advanced to 81.5% (22/27 tickets). 0 analyzer issues verified.
+
 
 

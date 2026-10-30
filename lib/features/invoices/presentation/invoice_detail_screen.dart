@@ -13,6 +13,7 @@ import '../../settings/data/business_profile_repository.dart';
 import '../data/invoice_repository.dart';
 import '../data/pdf_invoice_service.dart';
 import '../domain/models/invoice_model.dart';
+import '../../../core/services/notification_service.dart';
 
 // ---------------------------------------------------------------------------
 // Screen: Invoice Detail
@@ -39,6 +40,11 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
         : InvoiceStatus.paid;
 
     await ref.read(invoiceRepositoryProvider).updateInvoiceStatus(invoice.id, newStatus);
+    if (newStatus == InvoiceStatus.paid) {
+      await ref.read(notificationServiceProvider).cancelInvoiceReminders(invoice.id);
+    } else {
+      await ref.read(notificationServiceProvider).scheduleInvoiceReminders(invoice.copyWith(status: newStatus));
+    }
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

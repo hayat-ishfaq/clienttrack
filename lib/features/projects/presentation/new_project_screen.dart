@@ -9,6 +9,7 @@ import '../../clients/data/client_repository.dart';
 import '../../clients/domain/models/client_model.dart';
 import '../data/project_repository.dart';
 import '../domain/models/project_model.dart';
+import '../../../core/services/notification_service.dart';
 
 // ---------------------------------------------------------------------------
 // Screen: New Project / Edit Project
@@ -229,6 +230,7 @@ class _NewProjectScreenState extends ConsumerState<NewProjectScreen> {
       } else {
         await ref.read(projectRepositoryProvider).addProject(project);
       }
+      await ref.read(notificationServiceProvider).scheduleProjectDeadlineReminder(project);
 
       if (mounted) {
         setState(() => _isSaving = false);

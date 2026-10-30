@@ -11,6 +11,7 @@ import '../../clients/domain/models/client_model.dart';
 import '../data/invoice_repository.dart';
 import '../domain/models/invoice_model.dart';
 import '../domain/models/line_item_model.dart';
+import '../../../core/services/notification_service.dart';
 
 // Tax rate
 const double _kTaxRate = 0.15;
@@ -359,6 +360,7 @@ class _CreateInvoiceScreenState extends ConsumerState<CreateInvoiceScreen> {
       );
 
       await ref.read(invoiceRepositoryProvider).addInvoice(invoice);
+      await ref.read(notificationServiceProvider).scheduleInvoiceReminders(invoice);
 
       if (!mounted) return;
       setState(() => _isGenerating = false);
