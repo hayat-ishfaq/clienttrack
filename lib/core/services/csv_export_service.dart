@@ -1,4 +1,3 @@
-import 'dart:convert' show utf8;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
@@ -93,7 +92,7 @@ class CsvExportService {
 
     // CSV Header
     buffer.writeln(
-      'Project Title,Client Name,Status,Rate Type,Budget,Hourly Rate,Deadline,Notes',
+      'Project Title,Client Name,Status,Rate Type,Budget,Deadline,Notes',
     );
 
     for (final p in projects) {
@@ -103,7 +102,6 @@ class CsvExportService {
         _sanitizeCsv(p.status.name.toUpperCase()),
         _sanitizeCsv(p.rateType.name.toUpperCase()),
         p.budget.toStringAsFixed(2),
-        p.hourlyRate.toStringAsFixed(2),
         _sanitizeCsv(p.deadline != null ? dateFmt.format(p.deadline!) : 'None'),
         _sanitizeCsv(p.description),
       ].join(','));
@@ -124,28 +122,21 @@ class CsvExportService {
 
     final timestamp = DateFormat('yyyyMMdd').format(DateTime.now());
 
-    final invoiceFile = XFile.fromData(
-      utf8.encode(invoicesCsv),
-      mimeType: 'text/csv',
-      name: 'clienttrack_invoices_$timestamp.csv',
-    );
+    final consolidatedExport = StringBuffer()
+      ..writeln('=== INVOICES ===')
+      ..writeln(invoicesCsv)
+      ..writeln()
+      ..writeln('=== CLIENTS ===')
+      ..writeln(clientsCsv)
+      ..writeln()
+      ..writeln('=== PROJECTS ===')
+      ..writeln(projectsCsv);
 
-    final clientFile = XFile.fromData(
-      utf8.encode(clientsCsv),
-      mimeType: 'text/csv',
-      name: 'clienttrack_clients_$timestamp.csv',
-    );
-
-    final projectFile = XFile.fromData(
-      utf8.encode(projectsCsv),
-      mimeType: 'text/csv',
-      name: 'clienttrack_projects_$timestamp.csv',
-    );
-
-    await SharePlus.instance.shareXFiles(
-      [invoiceFile, clientFile, projectFile],
-      text: 'ClientTrack Accounting Export ($timestamp)',
-      subject: 'ClientTrack Accounting Export ($timestamp)',
+    await SharePlus.instance.share(
+      ShareParams(
+        text: consolidatedExport.toString(),
+        subject: 'ClientTrack Accounting Export ($timestamp)',
+      ),
     );
   }
 }
