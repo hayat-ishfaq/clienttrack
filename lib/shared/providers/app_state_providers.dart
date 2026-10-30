@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme/app_colors.dart';
 import '../../features/clients/data/client_repository.dart';
+import '../../features/clients/domain/models/client_model.dart';
 import '../../features/invoices/data/invoice_repository.dart';
 import '../../features/invoices/domain/models/invoice_model.dart';
 import '../../features/projects/data/project_repository.dart';
@@ -220,6 +221,49 @@ final clientPaymentSummaryProvider =
     tierBgColor: chipBg,
     tierFgColor: chipFg,
   );
+});
+
+// ── FT-031: Late-Payer Risk Model & Aggregator ─────────────────────────────
+
+@immutable
+class LatePayerRisk {
+  final ClientModel client;
+  final int overdueInvoicesCount;
+  final double totalOverdueAmount;
+  final int avgDaysLate;
+
+  const LatePayerRisk({
+    required this.client,
+    required this.overdueInvoicesCount,
+    required this.totalOverdueAmount,
+    required this.avgDaysLate,
+  });
+}
+
+/// Surfaces clients classified as Chronically Late who have pending overdue invoices.
+final latePayerRisksProvider = Provider<List<LatePayerRisk>>((ref) {
+  final clients = ref.watch(clientsStreamProvider).asData?.value ?? kSeedClients;
+  final invoices = ref.watch(invoicesStreamProvider).asData?.value ?? kSeedInvoices;
+
+  final List<LatePayerRisk> risks = [];
+
+  for (final client in clients) {
+    final clientInvoices = invoices.where((i) => i.clientId == client.id).toList();
+    if (clientInvoices.isEmpty) continue;
+
+    final summary = ref.watch(clientPaymentSummaryProvider(client.id));
+    if (summary.tier == ReliabilityTier.chronicallyLate && summary.overdueInvoicesCount > 0) {
+      risks.add(LatePayerRisk(
+        client: client,
+        overdueInvoicesCount: summary.overdueInvoicesCount,
+        totalOverdueAmount: summary.outstanding,
+        avgDaysLate: summary.avgDaysLate,
+      ));
+    }
+  }
+
+  risks.sort((a, b) => b.totalOverdueAmount.compareTo(a.totalOverdueAmount));
+  return risks;
 });
 
 // =============================================================================

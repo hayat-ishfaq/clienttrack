@@ -8,6 +8,8 @@ import 'package:go_router/go_router.dart';
 import '../../../app/router/route_names.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/services/notification_service.dart';
+import '../../../core/services/csv_export_service.dart';
+import '../../paywall/data/revenue_cat_service.dart';
 
 // ---------------------------------------------------------------------------
 // Screen: Settings
@@ -119,15 +121,49 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  void _handleExportCsv() {
-    HapticFeedback.mediumImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Exporting invoices and clients to CSV...'),
-        backgroundColor: AppColors.primaryForest,
-        duration: Duration(seconds: 2),
-      ),
-    );
+  Future<void> _handleExportCsv() async {
+    HapticFeedback.lightImpact();
+    final isPro = ref.read(isProProvider);
+
+    if (!isPro) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'CSV Export is a Pro feature. Upgrade to export your accounting data.',
+            style: TextStyle(fontFamily: 'Inter'),
+          ),
+          backgroundColor: AppColors.primaryForest,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          margin: const EdgeInsets.all(16),
+          action: SnackBarAction(
+            label: 'Upgrade',
+            textColor: Colors.white,
+            onPressed: () => context.push(AppRoutes.paywall),
+          ),
+        ),
+      );
+      context.push(AppRoutes.paywall);
+      return;
+    }
+
+    try {
+      await ref.read(csvExportServiceProvider).exportAndShareAll();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to export CSV: $e',
+              style: const TextStyle(fontFamily: 'Inter')),
+          backgroundColor: AppColors.overdueRed,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    }
   }
 
   void _showPolicyDialog(String title, String content) {

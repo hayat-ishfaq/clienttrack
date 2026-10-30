@@ -10,6 +10,7 @@ import '../../auth/data/auth_repository.dart';
 import '../../invoices/domain/models/invoice_model.dart';
 import '../../projects/domain/models/project_model.dart';
 import '../../settings/data/business_profile_repository.dart';
+import '../../paywall/data/revenue_cat_service.dart';
 import '../../../shared/providers/app_state_providers.dart';
 
 /// Screen 07: Main Dashboard Screen.
@@ -243,6 +244,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
               // 4. Needs Follow-up Alert Card
               _buildNeedsFollowUpCard(context, metrics.overdueInvoicesCount),
+              const SizedBox(height: 16),
+
+              // 4b. FT-031: Late-Payer Risk Alert Card (Pro Feature)
+              _buildLatePayerRiskSection(context),
               const SizedBox(height: 24),
 
               // 5. Deadlines Section
@@ -801,6 +806,224 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// 4b. FT-031: Late-Payer Risk Alert Card (Pro Feature)
+  Widget _buildLatePayerRiskSection(BuildContext context) {
+    final risks = ref.watch(latePayerRisksProvider);
+    if (risks.isEmpty) return const SizedBox.shrink();
+
+    final isPro = ref.watch(isProProvider);
+    final topRisk = risks.first;
+
+    if (isPro) {
+      // ── Unlocked Pro View: Surfacing High-Risk Late Payers ──
+      return Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFFBEB),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFFDE68A)),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFD97706).withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(width: 4.5, color: const Color(0xFFD97706)),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEF3C7),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.warning_amber_rounded,
+                                color: Color(0xFFB45309),
+                                size: 18,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            const Expanded(
+                              child: Text(
+                                'Late-Payer Risk Alert',
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF92400E),
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEF3C7),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '${risks.length} client${risks.length > 1 ? 's' : ''}',
+                                style: const TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFFB45309),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          '${topRisk.client.name} is classified as Chronically Late (avg. ${topRisk.avgDaysLate} days late) with \$${topRisk.totalOverdueAmount.toStringAsFixed(0)} overdue.',
+                          style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 13,
+                            color: Color(0xFF78350F),
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: InkWell(
+                            onTap: () {
+                              context.push('${AppRoutes.clients}/${topRisk.client.id}');
+                            },
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Review History',
+                                  style: TextStyle(
+                                    fontFamily: 'Inter',
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFFB45309),
+                                  ),
+                                ),
+                                SizedBox(width: 4),
+                                Icon(Icons.arrow_forward_rounded, size: 14, color: Color(0xFFB45309)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // ── Locked Free View: Promotional Pro Feature Preview ──
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.shield_outlined,
+              color: AppColors.textSecondary,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      'Late-Payer Risk Radar',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryForest,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'PRO',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${risks.length} client${risks.length > 1 ? 's' : ''} classified as high payment risk.',
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () => context.push(AppRoutes.paywall),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              backgroundColor: const Color(0xFFE2E8F0),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text(
+              'Unlock',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

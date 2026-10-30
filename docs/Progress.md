@@ -36,8 +36,8 @@ $$\mathbf{100\% \text{ Complete (P0 Scope: 27 / 27 Tickets Completed)}}$$
 | **Phase 4** | Local Notifications | Completed | 100% | 2 / 2 (P0) |
 | **Phase 5** | Monetization & RevenueCat | Completed | 100% | 4 / 4 (P0) |
 | **Phase 6** | Release Readiness & Store | Completed | 100% | 6 / 6 (P0) |
-| **Phase 7** | Post-P0 / Time-Permitting | Deferred | 0% | 0 / 10 (P1/P2) |
-| **TOTAL** | | | **73.0%** | **27 / 37** |
+| **Phase 7** | Post-P0 / Time-Permitting | In Progress | 20.0% | 2 / 10 (P1/P2) |
+| **TOTAL** | | | **78.4%** | **29 / 37** |
 
 ---
 
@@ -96,13 +96,13 @@ $$\mathbf{100\% \text{ Complete (P0 Scope: 27 / 27 Tickets Completed)}}$$
 - [ ] **FT-028**: Google Sign-In & Sign in with Apple (P1)
 - [ ] **FT-029**: AI-Polished Reminders via Cloud Functions (P1)
 - [ ] **FT-030**: "Did You Send It?" Post-Share Confirmation Sheet (P1)
-- [ ] **FT-031**: Late-Payer Risk Card on Dashboard (P1)
+- [x] **FT-031**: Late-Payer Risk Card on Dashboard (P1)
 - [ ] **FT-032**: Business Logo Upload for Invoices (P1)
 - [ ] **FT-033**: Free Trial Introductory Offer on Annual Plan (P1)
 - [ ] **FT-034**: Skeleton Loading Animations (P1)
 - [ ] **FT-035**: Project Sub-Tasks & Progress Tracker (P2)
 - [ ] **FT-036**: Partial Invoice Payment Tracking (P2)
-- [ ] **FT-037**: Accounting Data CSV Export (P2)
+- [x] **FT-037**: Accounting Data CSV Export (P2)
 
 ---
 
@@ -195,6 +195,10 @@ $$\mathbf{100\% \text{ Complete (P0 Scope: 27 / 27 Tickets Completed)}}$$
   3. Created `docs/STORE_SUBMISSION.md` (FT-026) with App Store & Google Play metadata, promotional descriptions, keywords, Apple Privacy Nutrition labels, Google Play Data Safety forms, and reviewer login credentials.
   4. Authored `docs/DEMO_VIDEO_SCRIPT.md` (FT-027) with scene-by-scene 2-minute 45-second timed walkthrough script and storyboard for hackathon presentation and store previews.
   5. **Master Milestone Achieved**: All 27 P0 Feature Tickets (Phases 0 through 6) are 100% completed and release-ready! Overall project progress advanced to 73.0% (27 / 37 tickets).
+- **2026-10-30**: Phase 7 Enhancements (FT-031 & FT-037):
+  1. Implemented `LatePayerRisk` model and `latePayerRisksProvider` in `app_state_providers.dart` (FT-031). Added interactive Late-Payer Risk Alert card to `dashboard_screen.dart` featuring real-time risk statistics for Pro users and a promotional preview radar card for Free tier.
+  2. Implemented `CsvExportService` in `lib/core/services/csv_export_service.dart` (FT-037) exporting structured CSV files for Invoices, Clients, and Projects, and wired directly to the Export CSV action in `settings_screen.dart` with native share sheet dispatch.
+  3. Total project scope advanced to 78.4% (29 / 37 tickets completed).
 
 
 
